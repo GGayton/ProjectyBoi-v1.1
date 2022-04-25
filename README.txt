@@ -11,7 +11,7 @@ MEASUREMENT:
 The measurement folder holds the modules and scripts required to run the fringe projection system.
 
 \measurement\ProjectyBoi2001.py 
-	initialises and runs all the code necessary, i.e.run ProjectyBoi2001.py 
+	initialises and runs all the code necessary, i.e. run ProjectyBoi2001.py 
 	to begin taking measurements.
 
 \measurement\ShowAllMeasurements.py 
