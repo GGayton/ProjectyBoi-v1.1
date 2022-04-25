@@ -19,7 +19,7 @@ The measurement folder holds the modules and scripts required to run the fringe 
 
 \measurement\projection regimes
 	Holds all the series of images required to take a measurement. Each "regime" is a .hdf5 file, each image is
-	labelled with a digit number, i.e., "00", "01", "02" ..., and will take a camera image (or multiple camera images
+	labelled with a two-digit number, i.e., "00", "01", "02" ..., and will take a camera image (or multiple camera images
 	if chosen) for each digit in that order. 
 
 The measurement modules and their functions are:
