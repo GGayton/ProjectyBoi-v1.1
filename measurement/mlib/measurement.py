@@ -6,21 +6,9 @@ from PySide2.QtCore import (
     Slot,
     )
 
-from PySide2.QtGui import (
-    QPixmap,
-    QImage,
-    QColor, 
-    qRgb
-    )
-from mlib.common_functions import(
-    convert_float_to_uint8_image,
-    )
-
-from mlib.common_qt_functions import(
-    array_to_QPixmap
-    )
-
-from mlib.console_outputs import (ProgressBar)
+from commonlib.common_functions import convert_float_to_uint8_image
+from commonlib.common_qt_functions import array_to_QPixmap
+from commonlib.console_outputs import ProgressBar
 
 import os
 import numpy as np
@@ -47,6 +35,8 @@ class TaskManager(QObject):
     project_N_images_signal = Signal(int)
     acquire_N_images_signal = Signal(int)
     save_N_images_signal = Signal(int)
+    bin_N_images_signal = Signal(int)
+
     
     toggle_camera_auto_mode_signal = Signal()
     command_signal = Signal()
@@ -73,6 +63,10 @@ class TaskManager(QObject):
         
         self.minVal = 0
         self.maxVal = 255
+        
+        self.warm_up_N = 10
+        
+        self.repetitions = 1
         
     @Slot(str)
     def load_in_images(self, directory):       
@@ -135,7 +129,7 @@ class TaskManager(QObject):
     def measure(self, N):
         #Initialise the projector to project N pictures
         self.project_N_images_signal.emit(N)
-        
+
         #Initialise the camera to take N pictures
         self.acquire_N_images_signal.emit(N)
         
@@ -147,7 +141,89 @@ class TaskManager(QObject):
         
         #Wait for finish condition
         self.finish_cond.acquire(3)
+       
+        #Clear the last camera condition            
+        self.projector_cond.acquire(1)
+    
+    @Slot()
+    def repeat_measurement(self):
+        t2 = time.time()
+        for i in range(self.repetitions):
+            t1 = time.time()
+            print("==== [Measurement {:02d}...] ====".format(i))
+            try:
+                self.measure(self.N)
+            except Exception as e:
+                raise e
+            
+            print("==== [Measurement {:02d} comlpeted: {}secs] ====".format(i, np.round(time.time()-t1, 2)))
+            time.sleep(5)
+        
+        #Disconnect
+        print("==== [Complete in {}secs] ====".format(np.round(time.time()-t2, 2)))
+            
+    @Slot(int)
+    def set_repetitions(self,N):
+        
+        self.repetitions = N
+        print("Measurement:     Taking {} measurement(s)".format(self.repetitions))
+    #%%
+    @Slot(int)
+    def set_warm_up(self,N):
+        
+        self.warm_up_N = N
+        print("Warm-up:         Taking {} image(s)".format(self.warm_up_N))
+
+    
+    @Slot()
+    def warm_up(self):
+        
+        t1 = time.time()
+        print("==== [Warm-up beginning...] ====")
+        
+        self.warm_up_ex(self.warm_up_N)
+        
+        print("==== [Complete in {}secs] ====".format(np.round(time.time()-t1, 2)))
+        
+    def warm_up_ex(self, N):
+        try:
+            
+            #Pass the images to the projector
+            self.create_random_images(N)
+            self.pass_to_projector(N)
+            
+            #Initialise the camera to take N pictures
+            self.acquire_N_images_signal.emit(N)
+            
+            #Initialise the projector to project N pictures
+            self.project_N_images_signal.emit(N)
+                        
+            #Initialise the image saver to save N pictures
+            self.bin_N_images_signal.emit(N)
+                        
+        except Exception as e:
+            print(e)
+
+        #Wait for finish condition
+        self.finish_cond.acquire(3)
         
         #Clear the last camera condition            
         self.projector_cond.acquire(1)
+        
+    def create_random_images(self,N):
+        
+        self.image_stack = []
+        bar = ProgressBar()
+        bar.updateBar(0,N)
 
+        
+        for i in range(N):
+            
+            temp_image = np.random.randint(0,255,(912,1140)).astype(np.uint8)
+                           
+            #Convert numpy array to QPixmap
+            self.image_stack.append(array_to_QPixmap(temp_image, image_type = 'Grayscale8'))
+            
+            bar.updateBar(i+1,N)
+
+            

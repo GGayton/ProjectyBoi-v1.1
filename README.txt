@@ -2,14 +2,24 @@
 
 OVERVIEW:
 Currently, this holds two sections: measurement and conversion.
+The file requirements.txt labels all necessary libraries required to run every script.
+In this readme - macrosync means taking a picture of the correct projection image, microsync is the synchronisation
+of camera exposure time and projector projection time.
 
 MEASUREMENT:
 The measurement folder holds the modules and scripts required to run the fringe projection system.
-Particularly, \measurement\ProjectyBoi2001.py is the script that initialises and runs all the code necessary, i.e.
-run ProjectyBoi2001.py to begin taking measurements.
 
-In this readme - macrosync means taking a picture of the correct projection image, microsync is the synchronisation
-of camera exposure time and projector projection time.
+\measurement\ProjectyBoi2001.py 
+	initialises and runs all the code necessary, i.e.run ProjectyBoi2001.py 
+	to begin taking measurements.
+
+\measurement\ShowAllMeasurements.py 
+	shows all the images taken during a particular measurement.
+
+\measurement\projection regimes
+	Holds all the series of images required to take a measurement. Each "regime" is a .hdf5 file, each image is
+	labelled with a digit number, i.e., "00", "01", "02" ..., and will take a camera image (or multiple camera images
+	if chosen) for each digit in that order. 
 
 The measurement modules and their functions are:
  - camera              | control the camera, macrosync

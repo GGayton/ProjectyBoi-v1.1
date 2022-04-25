@@ -127,6 +127,15 @@ class ImageSaver(QObject):
             print("Saver:          FAILURE:", e)
          
         self.finish_cond.release(1)
+    
+    @Slot(int)
+    def bin_N_images(self, N):
+        
+        for i in range(0,N):
+
+            self.camera_queue.get(timeout=10)
+            
+        self.finish_cond.release(1)
 #%% Save information
     def save_information(self, save_directory):
         

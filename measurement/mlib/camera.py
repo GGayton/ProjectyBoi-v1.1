@@ -1,9 +1,6 @@
 from vimba import *
 from PySide2.QtCore import (
-    QSemaphore,
-    QMutex,
     QObject,
-    Signal,
     Slot,
     )
 from PySide2.QtWidgets import (

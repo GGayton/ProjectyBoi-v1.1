@@ -1,0 +1,5 @@
+pyside2
+numpy
+scipy
+hdf5
+queue

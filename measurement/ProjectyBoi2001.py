@@ -1,10 +1,5 @@
 import os
 import queue
-import PySide2
-currentDir = os.getcwd()
-cutoff = currentDir.find("ProjectyBoi2001")
-assert cutoff!=-1
-home = currentDir[:cutoff+16]
 
 from PySide2.QtWidgets import (
     QApplication,
@@ -26,11 +21,11 @@ from PySide2.QtCore import (
     Slot,
     )
 
-from mlib.projector import ProjectorControl
-from mlib.streamer import ViewWindow
-from mlib.camera import CameraControl
-from mlib.saver import ImageSaver
-from mlib.measurement import TaskManager
+from commonlib.projector import ProjectorControl
+from commonlib.streamer import ViewWindow
+from commonlib.camera import CameraControl
+from commonlib.saver import ImageSaver
+from commonlib.measurement import TaskManager
 #%% Control window
 class ControlWindow(QMainWindow):
     
@@ -59,8 +54,9 @@ class ControlWindow(QMainWindow):
         grid = QGridLayout()
         grid.addWidget(self.create_measurement_box(),0,0)
         grid.addWidget(self.create_preparation_box(),0,1)
-        grid.addWidget(self.create_camera_box(),1,0)
-        grid.addWidget(self.create_close(),1,1)
+        grid.addWidget(self.create_repeat_box(),1,0)
+        grid.addWidget(self.create_warmup_box(),1,1)
+        grid.addWidget(self.create_close(),2,1)
         
         window.setLayout(grid)
         
@@ -79,7 +75,7 @@ class ControlWindow(QMainWindow):
         init_measurement.setObjectName("init_measurement")
                
         #Find the regime types
-        regime_file_dir = self.current_directory + '\\Projection Regimes'
+        regime_file_dir = self.current_directory + '\\Projection Regimes\\Regimes'
         regime_list = os.listdir(regime_file_dir)
         
         #Create regime control
@@ -97,7 +93,7 @@ class ControlWindow(QMainWindow):
         repeat.setSingleStep(1)
         repeat.setValue(1)
         repeat.setObjectName("repeat_camera_images")
-            
+                    
         vbox = QBoxLayout(QBoxLayout.TopToBottom)
 
         vbox.addWidget(init_measurement)
@@ -110,6 +106,33 @@ class ControlWindow(QMainWindow):
         
         return measurement_box
     
+    def create_warmup_box(self):
+        
+        warm_up_box = QGroupBox("Warm-up")
+
+        
+        warmup = QPushButton("Initiate")
+        warmup.setObjectName("init_warm_up")
+
+        
+        text1 = QLabel("Set repeats:")
+        warmup_repeat = QSpinBox()
+        warmup_repeat.setRange(1,500)
+        warmup_repeat.setSingleStep(1)
+        warmup_repeat.setValue(1)
+        warmup_repeat.setObjectName("warm_up_repeats")
+        
+        vbox = QBoxLayout(QBoxLayout.TopToBottom)
+
+        vbox.addWidget(text1)
+        vbox.addWidget(warmup_repeat)
+        vbox.addWidget(warmup)
+        vbox.addStretch(1)
+        
+        warm_up_box.setLayout(vbox)
+        
+        return warm_up_box
+            
     def create_preparation_box(self):
         
         preparation_box = QGroupBox("Preparation")
@@ -145,19 +168,19 @@ class ControlWindow(QMainWindow):
         
         return preparation_box
 
-    def create_camera_box(self):
-        camera_box = QGroupBox("Camera actions")
-        camera_box.setObjectName("camera")
+    def create_repeat_box(self):
+        camera_box = QGroupBox("Repeat measurements")
+        camera_box.setObjectName("repeat")
 
-        start = QPushButton("Take N images")
-        start.setObjectName("camera_start")
+        start = QPushButton("Take N measurements")
+        start.setObjectName("init_repeats")
         
         text1 = QLabel("Set N:")
         repeat = QSpinBox()
-        repeat.setRange(1,50)
+        repeat.setRange(1,100)
         repeat.setSingleStep(1)
         repeat.setValue(1)
-        repeat.setObjectName("camera_repeat")
+        repeat.setObjectName("repeat_num")
         
         vbox = QBoxLayout(QBoxLayout.TopToBottom)
         
@@ -182,7 +205,7 @@ class ControlWindow(QMainWindow):
     def define_regime_directory(self, regime_directory):
         
         #List all images
-        directory = self.current_directory + '\\Projection Regimes\\' + regime_directory
+        directory = self.current_directory + '\\Projection Regimes\\Regimes\\' + regime_directory
         
         print("Loading from:      [",directory,"]")
                
@@ -238,7 +261,7 @@ if __name__ == "__main__":
     image_saver = ImageSaver(
         camera_queue, 
         finish_cond,
-        home+"//Output Images//"
+        os.path.dirname(os.path.realpath(__file__)) + "\\Measurements\\"
         )
     
     task_manager= TaskManager(
@@ -271,6 +294,13 @@ if __name__ == "__main__":
     control_window.centralWidget().findChild(QPushButton, "init_measurement").\
         clicked.connect(task_manager.measurement)
         
+    #Repetition
+    control_window.centralWidget().findChild(QSpinBox, "repeat_num").\
+        valueChanged[int].connect(task_manager.set_repetitions)
+    control_window.centralWidget().findChild(QPushButton, "init_repeats").\
+        clicked.connect(task_manager.repeat_measurement)
+        
+        
     control_window.centralWidget().findChild(QComboBox, "regime_control").\
         activated[str].connect(control_window.define_regime_directory)
     control_window.update_images_signal.\
@@ -282,6 +312,8 @@ if __name__ == "__main__":
         connect(camera_control.take_N_images)
     task_manager.save_N_images_signal.\
         connect(image_saver.save_N_images)
+    task_manager.bin_N_images_signal.\
+        connect(image_saver.bin_N_images)
     
     #Preparation
     control_window.centralWidget().findChild(QPushButton, "target_screen").\
@@ -308,7 +340,14 @@ if __name__ == "__main__":
         valueChanged[int].connect(camera_control.set_repeat_images)
     control_window.centralWidget().findChild(QSpinBox, "repeat_camera_images").\
         valueChanged[int].connect(image_saver.set_repeat_images)  
-   
+        
+    #Warm up
+    control_window.centralWidget().findChild(QSpinBox, "warm_up_repeats").\
+        valueChanged[int].connect(task_manager.set_warm_up)
+    control_window.centralWidget().findChild(QPushButton, "init_warm_up").\
+        clicked.connect(task_manager.warm_up)
+        
+
     app.exec_()
     
     print("Goodbye")
