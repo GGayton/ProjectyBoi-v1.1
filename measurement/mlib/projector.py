@@ -30,10 +30,8 @@ class ProjectorControl(QWidget):
         #Current directory
         self.current_directory = os.path.dirname(os.path.realpath(__file__))
         
-        #Load home image
+        #Load images
         self.home_image = QPixmap("Home_screen.png")
-        
-        #Load target image
         self.target_image = QPixmap("Target_screen.png")
                       
         #Create the image label
@@ -42,7 +40,7 @@ class ProjectorControl(QWidget):
         #Initialise vairables
         self.image_index = -1
         
-        #Get screen information
+        #Get screen information - take projector as screen 2
         screens = QApplication.screens()       
         projector_screen = screens[1]
         
@@ -58,10 +56,10 @@ class ProjectorControl(QWidget):
         self.label.show()
         
         self.project_home_screen()
-             
+
+    #Change projector pixels and update     
     def project(self, image):
         
-
         #set image
         try:
             self.label.setPixmap(image)
@@ -88,7 +86,8 @@ class ProjectorControl(QWidget):
         
         #Show
         self.label.update() 
-        
+
+    #Main projection sequence   
     @Slot(int)
     def project_N_images(self, N):
                 

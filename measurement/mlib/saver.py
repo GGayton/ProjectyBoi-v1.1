@@ -18,7 +18,7 @@ class ImageSaver(QObject):
     
     Queue object : camera_queue (which passes the camera images to the saver thread)
     QSemaphore object: finish_cond (Tells the measurement class all is finished)
-    string object: gives the directory to save in
+    save_directory: gives the directory to save in
         
     """
     
@@ -37,6 +37,7 @@ class ImageSaver(QObject):
         
         self.repeat_N = 1
 
+    #Remove any images still in the queue
     def clear_queue(self):
         
         clearing = True
@@ -50,15 +51,15 @@ class ImageSaver(QObject):
                     time.sleep(0.1)
          
         print("Saver:          Queue cleared")
-        
+
+    #Set the number of camera images acquired for each projector image    
     @Slot(int)
     def set_repeat_images(self, N):
         
         self.repeat_N = N
         
         print("Saver:          Taking {} repeat image(s)".format(N))
-
-#%% Save measurements        
+       
     def create_measurement_directory(self):
         #Find time
         today = datetime.datetime.now()
@@ -76,9 +77,11 @@ class ImageSaver(QObject):
                             
         return time_directory
     
+    #Incremental mean
     def increment_mean(self, oldMean, newObs, N):
         return oldMean + (newObs - oldMean)/N
 
+    #Main save function
     @Slot(int)
     def save_N_images(self, N):
         
@@ -114,7 +117,7 @@ class ImageSaver(QObject):
         finally:
             f.close()    
         
-        #Check
+        #Check saved the correct amount of images
         try:
             f = h5py.File(measurement_directory+".hdf5", 'r')
             
@@ -128,6 +131,7 @@ class ImageSaver(QObject):
          
         self.finish_cond.release(1)
     
+    #bin images during warm-up sequence
     @Slot(int)
     def bin_N_images(self, N):
         
@@ -136,47 +140,4 @@ class ImageSaver(QObject):
             self.camera_queue.get(timeout=10)
             
         self.finish_cond.release(1)
-#%% Save information
-    def save_information(self, save_directory):
-        
-        saving = True
-        
-        while saving:
-            
-            pointer = self.camera_queue.get()
-            
-            #If LUT 
-            if pointer == "LUT":
-                print("Saver:          Writing LUT") 
-                LUT = self.camera_queue.get()
-                self.store_LUT(LUT, save_directory)
-             
-            #Regime writing
-            elif pointer == "REGIME":
-                print("Saver:          Writing regime") 
-                regime_list = self.camera_queue.get()
-
-                self.store_regime_list(regime_list, save_directory)
-        
-            #Exit condition
-            elif pointer == "0":
-                saving = False
-            
-            else:
-                print("Saver:          What is this?")
-                print(pointer)
-            
-            print("Saver:          Complete")    
-                 
-    def store_LUT(self, numpy_array, save_directory):
-        
-        LUT_filename = save_directory + "LUT"
-        
-        try:
-            np.save(LUT_filename, numpy_array)
-        except:
-            print("Saver:          LUT save failed")
-        
-
-
-        
+    

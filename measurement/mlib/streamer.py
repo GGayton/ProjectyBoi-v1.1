@@ -15,11 +15,11 @@ from PySide2.QtCore import (
     Slot,
     )
 import numpy as np
-from mlib.common_functions import (
+from commonlib.common_functions import (
     rescale_to_uint8,
     get_img_from_fig
     )
-from mlib.common_qt_functions import (
+from commonlib.common_qt_functions import (
     array_to_QPixmap
     )
 import cv2
