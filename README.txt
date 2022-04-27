@@ -1,7 +1,7 @@
 ### PROJECTYBOI 1.1 ###
 
 OVERVIEW:
-Currently, this holds two sections: measurement and conversion.
+Currently, this holds three sections: measurement, calibration and conversion.
 The file requirements.txt labels all necessary libraries required to run every script.
 In this readme - macrosync means taking a picture of the correct projection image, microsync is the synchronisation
 of camera exposure time and projector projection time. Macrosync is in code, microsync is from hardware.
@@ -9,9 +9,10 @@ The file Operation.txt holds the information needed to run this specific FP syst
 
 MEASUREMENT:
 The measurement folder holds the modules and scripts required to run the fringe projection system.
+The measurement is completed entirelyu using the QT library, which allows both multithreading, pixel writing and UI.
 
 \measurement\ProjectyBoi2001.py 
-	initialises and runs all the code necessary, i.e.run ProjectyBoi2001.py 
+	initialises and runs all the code necessary, i.e. run ProjectyBoi2001.py 
 	to begin taking measurements.
 
 \measurement\ShowAllMeasurements.py 
@@ -36,7 +37,10 @@ CONVERSION:
 The conversion folder holds the modules and scripts that converts the images captured during the measurement to a 
 point-cloud. The script for this is \conversion\convertToPointCloud.py. Currently, the parameters that define the
 fringe projection system are held in parameters \conversion\parameters\modelParameters.hdf5. These are found during
-the calibration and the calibration code is not yet added.
+the calibration and the calibration code is not yet functional.
+
+CALIBRATION:
+The calibration is compeleted using tensorflow, which serves to compute the gradient.
 
 HARDWARE CONSIDERATIONS
 This section is for considering replacing hardware (camera, projector etc).
