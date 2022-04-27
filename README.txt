@@ -43,7 +43,7 @@ This section is for considering replacing hardware (camera, projector etc).
 
 Currently, the projector and camera are microsynced using the HDMI signal output (~60hz). The signal is faster
 than the projector allows - its not truly projecting at this speed. The camera is microsynced using an option that 
-summarised by "take picture - wait for signal". Replacing hardware will likely require a new solution to this microsync
+summarised by "Wait for signal and then take picture". Replacing hardware will likely require a new solution to this microsync
 problem (good thing - this can be improved).
 
 The camera is controlled using an API called vimba - replacing the camera will require an entirely new
