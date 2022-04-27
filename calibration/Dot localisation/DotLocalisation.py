@@ -15,14 +15,23 @@ from defineEllipseJacobian import defineEllipseJacobian
 from commonlib.console_outputs import ProgressBar
 from scipy.stats import chi2
 from commonlib.common_functions import (
-    corrMatrixFromCovMatrix,
     plotErrorEllipse)
 
 import time
-# import sparse
 
 class DotLocalisation():
     
+    """
+    This class localises the centre of each dot in the imaged dot grid, which are imaged as ellipses.
+    The initial estimation is completed on a downsampled imaged using opencv, which will return an 
+    approximate centre of an ellipse. The centre is refined using a series of line-spread functions that radiate from the
+    approximate centre of the ellipse. The line-spread functions are used to find the boundary of the ellipse, which is then
+    used to find the centre of the ellipse.
+
+    The projector centre is inferred using the refined camera centre and the surrounding phase map (camera-projector correspondence)
+    to estimate what the projector centre is.
+    """
+
     def __init__(self):
         
         self.options = {
@@ -48,8 +57,7 @@ class DotLocalisation():
         
         self.JacobianFunction = defineEllipseJacobian()
         
-    #%% Main
-        
+    #main - localise all points    
     def localise(self, blankImage):
         
         bar = ProgressBar()
@@ -81,6 +89,7 @@ class DotLocalisation():
 
         return cParams,cV,sigma,sigmaStd
     
+    #infer the projector points using the refined camera centre and the surrounding phase map of the dot
     def infer(self,P,Vx,mappingX,mappingY):
         
         bar = ProgressBar()
@@ -121,7 +130,8 @@ class DotLocalisation():
             bar.updateBar(i+1, numPoints)
             
         return pParams, pV
-               
+
+    #Use opencv to return approximate ellipse centres   
     def extractCameraPoints(self,image, boardSize=(8,23), pointsNum=184):
                    
             #Subsample images
@@ -142,6 +152,7 @@ class DotLocalisation():
             
             return points
     
+    #refine an individual point from its 101x101 surrounding map
     def localisePoint(self,array):
         
         gradient = sampleImageGradient(array)
@@ -162,119 +173,8 @@ class DotLocalisation():
         x0n,y0n,an,bn,Tn,Vout = self.estimateTotalLeastSquaresEllipse(x,y,Vxy,index)
         
         return x0n,y0n,a,b,T,Vout,sigma,sigmaStd
-        
-    def Hessian(self, blankImage):
-                       
-        bar = ProgressBar()
-        
-        #Use cv2 to find board estimate
-        points = self.extractCameraPoints(blankImage)
-        
-        numPoints = 184
-        
-        bar.updateBar(0,numPoints)
-        
-        J = [None for _ in range(184)]
-        H = [None for _ in range(184)]
-        loss = [None for _ in range(184)]
-        for i in range(numPoints):
-            
-            dot = points[i,:]
-
-            array,xAdd,yAdd = extractRegion(blankImage, dot, 50)
-            
-            J[i],H[i],loss[i] = self.localiseHessian(array)
-            
-            # J[i] = sparse.COO(J[i])
-            # H[i] = sparse.COO(H[i])
-            
-            bar.updateBar(i+1,numPoints)
-
-        return J,H,loss
-    
-    def localiseHessian(self,array):
-        
-        gradient = sampleImageGradient(array)
-            
-        z,ix,iy = self.LSFsamples(gradient)
-        
-        numLines = self.options["numLines"]
-        resLines = self.options["resLines"]
-
-        x = np.tile(np.linspace(0,1,resLines).reshape(-1,1), [numLines,1])
-        
-        y1 = z/z.max(axis=0)
-        y = y1.T.reshape(-1,1)
-        
-        zSum = np.sum(z, axis=1)
-        zSum[:20] = 0
-        
-        muEst = np.argmax(zSum)/z.shape[0]
-        
-        X = np.empty((1+numLines*2,1))
-        X[0,0] = 0.1
-        X[1::2,0] = muEst
-        X[2::2,0] = 1
-        
-        params, J, loss =  self.NLS.solve(x,y,X)
-        
-        # H = np.zeros((params.shape[0], params.shape[0],x.shape[0]))
-        
-        # for i in range(numLines):
-            
-        #     xin = y1[:,i]
-        #     Xin = X[[0,i*2+1, i*2+2]]
-        #     h = self.hessianFunction(xin,Xin)
-            
-        #     ia = i*resLines
-        #     ib = ia + resLines
-            
-        #     H[0,0,ia:ib] = h[0,0,:]
-        #     H[i*2+1:i*2+3,0,ia:ib] = h[0,1:,:]
-        #     H[0,i*2+1:i*2+3,ia:ib] = h[1:,0,:]
-        #     H[i*2+1:i*2+3,i*2+1:i*2+3,ia:ib] = h[1:,1:,:]
-            
-        H =[]
-        Jnew = []
-        for i in range(numLines):
-            
-            xin = y1[:,i]
-            Xin = X[[0,i*2+1, i*2+2]]
-            H += [self.hessianFunction(xin,Xin)]
-            
-            ia = i*resLines
-            ib = ia + resLines
-            Jnew += [J[ia:ib, [0,2*i+1,2*i+2]]]
-        
-        H = np.dstack(H)
-        Jnew = np.vstack(Jnew)
-                        
-        return Jnew,H,loss
-        
-    def hessianFunction(self,x, X):
-        """
-        sigma,mu,A
-        """
-        s = X[0]
-        mu = X[1]
-        A = X[2]
-        
-        f = A*np.exp( - (x-mu)**2/(2*s**2))
-        
-        H = np.zeros((3, 3,x.shape[0]))
-        
-        H[0,0] = -3*A*(-mu + x)**2*f/s**4 + A*(-mu + x)**4*f/s**6
-        H[1,1] = -A*f/s**2 + A*(2*mu - 2*x)**2*f/(4*s**4)
-        
-        H[1,0] = H[0,1] = A*(2*mu - 2*x)*f/s**3 - A*(-mu + x)**2*(2*mu - 2*x)*f/(2*s**5)
-        H[2,0] = H[0,2] = (-mu + x)**2*f/s**3
-        H[1,2] = H[2,1] = -(2*mu - 2*x)*f/(2*s**2)
-        
-        
-        return H
-        
-    #%% Refine border estimation
-    
+                
+    #Interpolate some line-spread functions
     def LSFsamples(self,gradient):
         
         numLines = self.options["numLines"]
@@ -301,6 +201,7 @@ class DotLocalisation():
     
         return z,ix,iy
     
+    #Fit a gaussian peak to the line-spread functions to estimate where the peak is
     def refineLineSpreadFunctions(self,z,ix,iy):
         
         numLines = self.options["numLines"]
@@ -357,6 +258,7 @@ class DotLocalisation():
         
         return xnew, ynew, Vxy, params[0,0], Vparams[0,0]**0.5
 
+    #propagate uncertainty in gaussian peak fitting to XY pixel location
     def estimateXYCov(self,ix,iy,Vpos):
                        
         N = Vpos.shape[0]
@@ -377,13 +279,13 @@ class DotLocalisation():
         # V[index, index] = 1e-10
         
         return V
-        
-    #%% RANSAC cleaning
-    
+            
     @staticmethod
     def rotate2D(xp,yp,T):
         return xp*np.cos(T) - yp*np.sin(T), xp*np.sin(T) + yp*np.cos(T)
     
+    #Analytical method for closest point on ellipse, taken from 
+    #"A closed-form general solution for the distance of point-to-ellipse in two dimensions"
     def closestPointOnEllipse(self,X,Y,x0,y0,a,b,T):
         
         #Rescale and typecast
@@ -455,6 +357,8 @@ class DotLocalisation():
 
         return xe,ye
     
+    #Obtain a random selection of points for RANSAC, but try to ensure that not all points 
+    #are on the same side of the ellipse (which gives poor ellipse fit)
     @staticmethod
     def pseudoRandom(I):
         
@@ -465,6 +369,7 @@ class DotLocalisation():
         
         return np.concatenate((np.random.choice(I[:H],a,False), np.random.choice(I[H:],b,False)))
     
+    #RANSAC clean ellipse
     def cleanEllipse(self,x,y,iterations=100):
                 
         I = np.arange(0,x.shape[0],1)
@@ -506,6 +411,7 @@ class DotLocalisation():
                                 
         return indexOut
     
+    #least square ellipse fitting
     def estimateLeastSquaresEllipse(self,x,y):
         
         xMean = x.mean()
@@ -522,8 +428,7 @@ class DotLocalisation():
         
         return x0+xMean, y0+yMean, a, b ,T
     
-    #%% Estimate ellipse
-        
+    #total least square ellipse fitting   
     def estimateTotalLeastSquaresEllipse(self,x,y,Vxy,I):
         
         xOffset = np.mean(x)
@@ -555,6 +460,7 @@ class DotLocalisation():
         
         return x0+xOffset,y0+yOffset,a,b,T,Vell
     
+    #convert fitted ellipse parameters to the classic parameters (x0,y0,a,b,theta)
     def convertCoeffsToParams(self,A,B,C,D,E):
         
         theta = 0.5*np.arctan2(-B, C-A)
@@ -577,6 +483,7 @@ class DotLocalisation():
         if a<0 or b<0: return [np.nan]*5
         else: return x0,y0,a**0.5,b**0.5,theta     
     
+    #converts fitted ellipse parameters AND propagates uncertainty in their parameters
     def defineEllipseFromCoeffs(self,coeffs,V):
         
         A = coeffs[0,0]
@@ -594,8 +501,9 @@ class DotLocalisation():
         
         
         return self.convertCoeffsToParams(A,B,C,D,E), Vell
-           
-    def outsideIndex(self,x0,y0,a,b,theta,L=111):
+
+    #return mask to obtain pixels outside ellipse boundary
+    def outsideIndex(self,x0,y0,a,b,theta,L=101):
                 
         x = np.linspace(0, L-1, L).reshape(-1,1) - (L+1)//2
         y = np.linspace(0, L-1, L).reshape(1,-1) - (L+1)//2
@@ -609,7 +517,8 @@ class DotLocalisation():
         O[1,0] = int(np.round(y0))
         
         return np.vstack(np.nonzero(F>0)) + O - (L+1)//2
-     
+    
+    #estimate the transform of camera pixels to projector pixels - estimated as linear transform
     def estimateTransform(self,C,P):
                        
         C1 = np.zeros((C.shape[0]*2, 6))
@@ -639,8 +548,7 @@ class DotLocalisation():
                         
         return A1,V
     
-    #%% Initialisation
-    
+    #Initialise the non-linear solver for the gaussian fitting
     def initialiseNLS(self):
         
         numLines = self.options["numLines"]
@@ -683,14 +591,14 @@ class DotLocalisation():
 
         self.NLS = NonLinearSolver(jacobianFunction, transformFunction)
         self.NLS.setOptions(self.NLSoptions)
-        
+
+    #Initialise the linear solver for the ellipse fitting methods    
     def initialiseLS(self):
         
         self.LS = LinearSolver()
         self.LS.setOptions(self.LSoptions)
-        
-    #%% Troubleshooting
-    
+
+    #Troubleshoot single ellipse localisation by passing the blank image    
     def troubleshootLocalisation(self,blankImage,i):
 
         #Use cv2 to find board estimate
@@ -747,7 +655,8 @@ class DotLocalisation():
         print("Position: {0:.4g},".format(x0n), " {0:.4g}".format(y0n))
         print("Covariance: {0:.4g},".format(Vout[0,0]**0.5), " {0:.4g},".format(Vout[1,1]**0.5), " {0:.4g}".format(Vout[0,1]/(Vout[0,0]**0.5*Vout[1,1]**0.5)))
         print("rChi2: {0:.04g}".format(np.sum(val)))
-        
+
+    #Trobleshoot single ellipse by passing the ellipse image
     def troubleshootArray(self,array):
 
         t1=time.time()       
@@ -787,6 +696,7 @@ class DotLocalisation():
         print("Position: {0:.4g}, {0:.4g}".format(x0n,y0n))
         print("Covariance: {0:.4g}, {0:.4g}, {0:.4g}" .format(Vout[0,0]**0.5, Vout[1,1]**0.5, Vout[0,1]/(Vout[0,0]*Vout[1,1])))
     
+    #Troubleshoot the projector point inference method
     def troubleshootInference(self,P,mappingX,mappingY,i):
         
         x0,y0,a,b,T = P[i,:]

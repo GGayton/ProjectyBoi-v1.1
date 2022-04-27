@@ -7,6 +7,10 @@ In this readme - macrosync means taking a picture of the correct projection imag
 of camera exposure time and projector projection time. Macrosync is in code, microsync is from hardware.
 The file Operation.txt holds the information needed to run this specific FP system.
 
+Measurement takes the images and serves to sync/run the FP system. It returns only images.
+Conversion converts the images to a point-cloud.
+Calibration quantifies the parameters that define the system e.g. focal length etc.
+
 MEASUREMENT:
 The measurement folder holds the modules and scripts required to run the fringe projection system.
 The measurement is completed entirelyu using the QT library, which allows both multithreading, pixel writing and UI.
