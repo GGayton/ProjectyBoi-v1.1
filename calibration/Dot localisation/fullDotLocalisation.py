@@ -1,94 +1,90 @@
-import os
-import sys
+#%%
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+import sys
 
+if r"..\\..\\" not in sys.path: sys.path.append(r"..\\..\\")
 
-currentDir = os.getcwd()
-cutoff = currentDir.find("ProjectyBoy2000")
-assert cutoff != -1
-home = currentDir[:cutoff+16]
-
-if home not in sys.path:sys.path.append(home)
-if home+"Phase decoding" not in sys.path:sys.path.append(home+"Phase decoding")
-
-from Decoding import Decode
-
-from commonlib.h5py_functions import load_h5py_arrays
-from commonlib.common_functions import listdir
+from commonlib.file_finder import list_dir
+from commonlib.h5py_functions import trydel
 
 from DotLocalisation import DotLocalisation
 #%% Choose datatsets
 
-dataset = "2021_09_12"
+dataset = "2022_02_24"
+datadir = r"..\\data\\"
 
-phaseMapDataset = home + r"\Calibration\Data\\" + dataset + "\\Inputs\\phaseMaps.hdf5"
+phasemap_dataset = datadir + dataset + r"\\Inputs\\phaseMaps.hdf5"
 decodeType = "filtered"
 
-rawDataset = home + r"\Calibration\Data\\" + dataset + "\\Raw Data\\"
-rawDatasetList = listdir(rawDataset, lambda x: x[-5:]=='.hdf5')
+raw_dataset = datadir + dataset + "\\Raw Data\\"
+raw_list = list_dir(raw_dataset, lambda x: x[-5:]=='.hdf5')
 
-outputFilename = home + r"\Calibration\Data\\" + dataset + "\\Inputs\\dots.hdf5"
+output_filename = datadir + dataset + r"\\Inputs\\dotsTest.hdf5"
+
+board_filename = datadir + dataset + r"\\Inputs\\board.hdf5"
         
 #%% Initialise
-dotLocaliser = DotLocalisation()
+localiser = DotLocalisation()
 
-#%%
-for i in range(len(rawDatasetList)):
+with h5py.File(board_filename, 'r') as f:
+    board = f["board"][()]
+
+#%% localise all points
+for i in range(3):#len(raw_list)):
     
     print('=== {:02d} ==='.format(i))
     
     print('Load blank image...')
-    datasetString = rawDataset + rawDatasetList[i]
-    blankImage = load_h5py_arrays(datasetString, 0)
-    
-    # dotLocaliser.extractCameraPoints(blankImage)
-    
+    dataset_string = raw_dataset + raw_list[i]
+    with h5py.File(dataset_string, 'r') as f:
+
+        blank_image = f["00"][()]
+        
     print('Load phase maps...')
-    with h5py.File(phaseMapDataset, 'r') as f:
+    with h5py.File(phasemap_dataset, 'r') as f:
         mappingX = f[decodeType+"//{:02d}//X".format(i)][()]
         mappingY = f[decodeType+"//{:02d}//Y".format(i)][()]
        
     print('Localising camera points...')
-    cParams,V,sigma,sigmaStd = dotLocaliser.localise(blankImage)
+    cParams,V,sigma,sigmaStd = localiser.localise(blank_image)
     
     print('Inferring projector points...')
-    pParams,W = dotLocaliser.infer(cParams,V,mappingX,mappingY)
+    pParams,W = localiser.infer(cParams,V,mappingX,mappingY)
     
-    with h5py.File(outputFilename, 'a') as f:
+    with h5py.File(output_filename, 'a') as f:
         
         string = "{:02d}".format(i)
         
-        if "/camera/points/"+string in f.keys():
+        if string+r"\\camera\\points" in f.keys():
             
-            try:
-                del f["/camera/points/"+string]
-                del f["/camera/A/"+string]
-                del f["/camera/B/"+string]
-                del f["/camera/theta/"+string]
-                del f["/camera/sigma/"+string]
-                del f["/camera/sigmaStd/"+string]
-                del f["/camera/covariance/"+string]
-                del f["/projector/points/"+string]
-                del f["/projector/covariance/"+string]
-            except: 
-                pass
+            trydel(f,string+r"\\camera\\points")
+            trydel(f,string+r"\\camera\\A")
+            trydel(f,string+r"\\camera\\B")
+            trydel(f,string+r"\\camera\\theta")
+            trydel(f,string+r"\\camera\\sigma")
+            trydel(f,string+r"\\camera\\sigmaStd")
+            trydel(f,string+r"\\camera\\covariance")
+            trydel(f,string+r"\\projector\\points")
+            trydel(f,string+r"\\projector\\covariance")
+            trydel(f,string+r"\\board\\points")
             
-        f.create_dataset("/camera/points/"+string, data=cParams[:,:2])
-        f.create_dataset("/camera/A/"+string, data=cParams[:,2])  
-        f.create_dataset("/camera/B/"+string, data=cParams[:,3])  
-        f.create_dataset("/camera/theta/"+string, data=cParams[:,4])
-        f.create_dataset("/camera/sigma/"+string, data=sigma)  
-        f.create_dataset("/camera/sigmaStd/"+string, data=sigmaStd)
-        f.create_dataset("/camera/covariance/"+string, data=V)
+        f.create_dataset(string+r"\\camera\\points", data=cParams[:,:2], compression='lzf')
+        f.create_dataset(string+r"\\camera\\A", data=cParams[:,2])  
+        f.create_dataset(string+r"\\camera\\B", data=cParams[:,3])  
+        f.create_dataset(string+r"\\camera\\theta", data=cParams[:,4])
+        f.create_dataset(string+r"\\camera\\sigma", data=sigma)  
+        f.create_dataset(string+r"\\camera\\sigmaStd", data=sigmaStd)
+        f.create_dataset(string+r"\\camera\\covariance", data=V, compression='lzf')
 
-        
-        f.create_dataset("/projector/points/"+string, data=pParams[:,:2])  
-        # f.create_dataset("/projector/A/"+string, data=pParams[:,2])  
-        # f.create_dataset("/projector/B/"+string, data=pParams[:,3])  
-        # f.create_dataset("/projector/theta/"+string, data=pParams[:,4])
-        f.create_dataset("/projector/covariance/"+string, data=W)
+        f.create_dataset(string+r"\\projector\\points", data=pParams[:,:2], compression='lzf')  
+        f.create_dataset(string+r"\\projector\\covariance", data=W, compression='lzf')
+
+        f.create_dataset(string+r"\\board\\points", data=board, compression='lzf')
+
     
     print('==========')
 
+# %%
