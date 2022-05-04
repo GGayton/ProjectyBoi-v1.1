@@ -1,20 +1,39 @@
 import tensorflow as tf
 
-DATATYPE = tf.float64
-
 class Calibration():
 #%%   
-    def __init__(self):
-        return
-    
-    @tf.function(input_signature=(tf.TensorSpec(shape=[3], dtype=DATATYPE),))
-    def rodrigues(self,r):
+    def __init__(self, datatype=tf.float64):
+        self.datatype = datatype
+        self.init_base_functions()
+
+    def init_base_functions(self):
         
-        print("Tracing: Rodrigues")
+        print("Tracing...", end="")
+        
+        self.rodrigues_TF = tf.function(self.rodrigues,
+            input_signature=(tf.TensorSpec(shape=[3], dtype=self.datatype),))
+        self.rodrigues_TF = self.rodrigues_TF.get_concrete_function()
+
+        self.rodriguesinv_TF = tf.function(self.rodriguesinv,
+            input_signature=(tf.TensorSpec(shape=[3,3], dtype=self.datatype),))
+        self.rodriguesinv_TF = self.rodriguesinv_TF.get_concrete_function()
+
+        self.assemble_camera_matrix_TF = tf.function(self.assemble_camera_matrix,
+            input_signature=(tf.TensorSpec(shape=[5], dtype=self.datatype),))
+        self.assemble_camera_matrix_TF = self.assemble_camera_matrix_TF.get_concrete_function()
+
+        # self.JtJ_TF = tf.function(self.JtJ)
+        # self.JtJ_TF = self.JtJ_TF.get_concrete_function()
+
+        # self.weighted_JtJ_TF = tf.function(self.weighted_JtJ)
+        # self.weighted_JtJ_TF = self.weighted_JtJ_TF.get_concrete_function()
+        print("done")
+
+    def rodrigues(self,r):
             
         theta = tf.math.sqrt(tf.math.reduce_sum(tf.math.square(r)))
         
-        zero = tf.zeros((1), dtype = DATATYPE)
+        zero = tf.zeros((1), dtype = self.datatype)
         
         r_norm = r/theta
         
@@ -28,12 +47,11 @@ class Calibration():
         
         K = tf.reshape(K, (3,3))
     
-        R = tf.eye(3, dtype = DATATYPE) + tf.sin(theta)*K + (1-tf.cos(theta))*K@K
+        R = tf.eye(3, dtype = self.datatype) + tf.sin(theta)*K + (1-tf.cos(theta))*K@K
         
         return R
     
-    @tf.function(input_signature=(tf.TensorSpec(shape=[3,3], dtype=DATATYPE),))
-    def rodriguesInv(self,R):
+    def rodriguesinv(self,R):
         
         angle = tf.math.acos(( R[0,0] + R[1,1] + R[2,2] - 1)/2)
         
@@ -55,15 +73,12 @@ class Calibration():
         
         return r
         
-    @tf.function(input_signature=(tf.TensorSpec(shape=[5], dtype=DATATYPE),))
-    def cameraMatrix(self,k):
-            
-        print("Tracing: Camera matrix")
-        
+    def assemble_camera_matrix(self,k):
+                    
         fx, fy, s, u0, v0 = tf.split(k,5)
         
-        zero = tf.zeros((1), dtype = DATATYPE)
-        one = tf.ones((1), dtype = DATATYPE)
+        zero = tf.zeros((1), dtype = self.datatype)
+        one = tf.ones((1), dtype = self.datatype)
         
         K = tf.concat([
             tf.concat([fx, s, u0], 0),
@@ -74,32 +89,40 @@ class Calibration():
         K = tf.reshape(K, (3,3))
         
         return K
-                         
-    #Approximate a rotation matrix from generic matrix
-    def approximateMatrixWithR(self,Q):
-        
-        s,u,v = tf.linalg.svd(Q, full_matrices=True)
-        R = u@tf.transpose(v)
-        return R
-               
-    def printUpdate(self, Epoch, damping_factor, loss_sum):
+                                        
+    def print_update(self, epoch, damping_factor, loss_sum):
 
         tf.print(
-            "Epoch: ",Epoch,
+            "Epoch: ", epoch,
             ", lambda: ", damping_factor,
             ", loss: ", loss_sum)
     
-    def iterateDamping(self,dampingFactor, change):
+    def iterate_damping(self, damping_factor, change):
         
-        dampingFactor = dampingFactor*change
+        damping_factor = damping_factor*change
         
-        if dampingFactor<1e-5: dampingFactor = dampingFactor*0 + 1e-5
+        if damping_factor<1e-5: damping_factor = damping_factor*0 + 1e-5
         
-        return dampingFactor
-#%%          
+        return damping_factor
+
+    def JtJ(self,J,damping_factor):
+                          
+        JtJ = tf.transpose(J) @ J
+                
+        JtJ  = JtJ + damping_factor * tf.linalg.tensor_diag_part(JtJ)*tf.eye(J.shape[1], dtype = self.datatype)
+        
+        return JtJ
+    
+    def weighted_JtJ(self,J,W,damping_factor):
+                         
+        JtJ = tf.transpose(J) @ W @ J
+                
+        JtJ  = JtJ + damping_factor * tf.linalg.tensor_diag_part(JtJ)*tf.eye(J.shape[1], dtype = DATATYPE)
+        
+        return JtJ
+                      
     def train(self,x,y,X,dampingFactor,DISPLAY,FAILURE_COUNT_MAX,CHANGE_MIN,ITERATION_MAX):
-        
-        print("Tracing: Train")                
+                    
         optimised = tf.constant(False, dtype = tf.bool)
         
         failureCount = 0
@@ -111,7 +134,7 @@ class Calibration():
         lossSum = tf.math.reduce_sum(loss**2)
         J = self.jacobianFunction(x,X)
         
-        lossSumChange = tf.constant(1,dtype = DATATYPE)
+        lossSumChange = tf.constant(1,dtype = self.datatype)
                 
         while not optimised:
             
@@ -120,19 +143,9 @@ class Calibration():
             # update = tf.linalg.lstsq(JtJ, tf.transpose(J) @ loss, fast=False)
             update = tf.linalg.inv(JtJ) @ tf.transpose(J) @ loss
             
-            # dir_div = self.geodesicAcceleration(x,X,update,J)
-            
-            # geoUpdate = tf.linalg.lstsq(JtJ, tf.transpose(J) @ dir_div, fast=False)/2
-            
-            # geoCondition = tf.math.less_equal(
-            #     tf.reduce_sum(geoUpdate**2)**0.5 / tf.reduce_sum(update**2)**0.5,
-            #     0.8)
-            
-            # tf.print(tf.reduce_sum(geoUpdate**2)**0.5 / tf.reduce_sum(update**2)**0.5)
-
             #Assign the update
-            XUpdate = X + update[:,0] #+ tf.cast(geoCondition, DATATYPE)*geoUpdate[:,0]
-                
+            XUpdate = X + update[:,0] 
+
             #Calculate a new loss
             lossUpdate = y - self.transformFunction(x,XUpdate)
             
@@ -180,8 +193,7 @@ class Calibration():
         loss = y - self.transformFunction(x,X)
 
         return X, J, loss
-
-#%%        
+  
     def weightedTrain(self,x,y,X,W,dampingFactor,DISPLAY,FAILURE_COUNT_MAX,CHANGE_MIN,ITERATION_MAX):
         
         print("Tracing: Train")                
@@ -196,7 +208,7 @@ class Calibration():
         lossSum = tf.math.reduce_sum(loss**2)
         J = self.jacobianFunction(x,X)
         
-        lossSumChange = tf.constant(1,dtype = DATATYPE)
+        lossSumChange = tf.constant(1,dtype = self.datatype)
                 
         while not optimised:
             
@@ -255,43 +267,6 @@ class Calibration():
         loss = y - self.transformFunction(x,X)
 
         return X, J, loss
-
-#%%    
-    @tf.function
-    def JtJFunction(self,J,damping_factor):
-    
-        print("Tracing: JtJFunction")
-                      
-        JtJ = tf.transpose(J) @ J
-                
-        JtJ  = JtJ + damping_factor * tf.linalg.tensor_diag_part(JtJ)*tf.eye(J.shape[1], dtype = DATATYPE)
-        
-        return JtJ
-    
-    @tf.function
-    def weightedJtJFunction(self,J,W,damping_factor):
-    
-        print("Tracing: weightedJtJFunction")
-                      
-        JtJ = tf.transpose(J) @ W @ J
-                
-        JtJ  = JtJ + damping_factor * tf.linalg.tensor_diag_part(JtJ)*tf.eye(J.shape[1], dtype = DATATYPE)
-        
-        return JtJ
-            
-    @tf.function
-    def geodesicAcceleration(self,x,X,update,J):
-        
-        print("Tracing: geodesicAcceleration")
-        
-        h = 0.1
-        
-        function = self.transformFunction(x,X)
-        functionUpdate = tf.reshape(self.transformFunction(x,X+tf.squeeze(h*update)), (-1,1))
-        
-        dirDiv = 2/h * ((functionUpdate - function)/h - J@update)
-        
-        return dirDiv
     
 
 

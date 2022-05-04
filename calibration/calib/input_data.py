@@ -3,37 +3,69 @@ import tensorflow as tf
 import h5py
 from commonlib.h5py_functions import num_of_keys
 
-class InputDataTF():
+class InputData():
+    
+    def __init__(self, datatype=tf.float64):
+        self.datatype = datatype
+
+    def load_inputs(self, filename):
+        self.num_positions = num_of_keys(filename, "inputs")
+        with h5py.File(filename, 'r') as f:
             
-    def setCameraPoints(self,dataIn):
-        self.cPoints = dataIn.copy()
+            #Identify all components by their second level key
+            self.keys = list(f["inputs"]["00"].keys())
+            for key in f["inputs"].keys():
+                for ckey in f["inputs"][key].keys():
+                    if ckey not in self.keys: self.keys.append(ckey)
+
+            #initialise the point dictionary
+            self.points = {}
+            self.artefact = {}
+            self.keymap = np.empty((self.num_positions, len(self.keys)), dtype = int)
+            tkey = list(f["inputs"].keys())
+            for i in range(len(self.keys)):
+                self.points[self.keys[i]] = {}
+                self.artefact[self.keys[i]] = {}
+                
+                for j in range(len(tkey)):
+                    if self.keys[i] in list(f["inputs"][tkey[j]].keys()):
+                        self.points[self.keys[i]][tkey[j]] = f["inputs"][tkey[j]][self.keys[i]]["points"][()]
+                        self.artefact[self.keys[i]][tkey[j]] = f["inputs"][tkey[j]][self.keys[i]]["artefact"][()]
+                        self.keymap[j,i] = self.points[self.keys[i]][tkey[j]].shape[0]
+
+                        assert self.points[self.keys[i]][tkey[j]].shape[0] == self.artefact[self.keys[i]][tkey[j]].shape[0],\
+                            "Number of measured points and artefact points must be the same."
+                    else:
+                        self.points[self.keys[i]][tkey[j]] = np.nan
+                        self.artefact[self.keys[i]][tkey[j]] = np.nan
+                        self.keymap[j,i] = 0
+
+    def get_inputs_TF(self):
+        out = [[] for _ in range(len(self.keys))]
+        for i in range(len(self.keys)):
+            temp = []
+            for j in range(self.num_positions):
+                temp += [self.points[self.keys[i]]["{:02d}".format(j)].T.reshape(-1,1)]
+            out[i] = np.vstack(temp)
         
-        for i in range(len(self.cPoints)):
-            assert self.cPoints[i].shape[1]<self.cPoints[i].shape[0]
-            self.cPoints[i] = self.cPoints[i][:,:2]
-            
-        self.cPoints = self.moveToGPU(self.cPoints)
+        return out
+
+    def get_inputs_numpy(self):
+        out = [[] for _ in range(len(self.keys))]
+        art = [[] for _ in range(len(self.keys))]
+
+        for i in range(len(self.keys)):
+            point_set = []
+            art_set = []
+            for j in range(self.num_positions):
+                point_set += [self.points[self.keys[i]]["{:02d}".format(j)]]
+                art_set += [self.artefact[self.keys[i]]["{:02d}".format(j)]]
+
+            out[i] = point_set
+            art[i] = art_set
         
-        self.positionNum = len(dataIn)
-        
-    def setProjectorPoints(self,dataIn):
-        self.pPoints = dataIn.copy()
-        
-        for i in range(len(self.pPoints)):
-            assert self.pPoints[i].shape[1]<self.pPoints[i].shape[0]
-            self.pPoints[i] = self.pPoints[i][:,:2]
-            
-        self.pPoints = self.moveToGPU(self.pPoints)
-        
-    def setBoardPoints(self,dataIn):
-        
-        self.board = dataIn
-        # self.board[:,2] = 0
-        assert self.board.shape[1]<self.board.shape[0]
-        self.board = tf.constant(self.board, dtype = DATATYPE)
-        
-        self.pointNum = self.board.shape[0]
-        
+        return out,art
+
     def loadEstimate(self, filename, nDist):
         
         with h5py.File(filename, 'r') as f:
@@ -100,34 +132,8 @@ class InputDataTF():
         self.setProjectorPoints(pPoints)
         self.setCameraPoints(cPoints)
 
-    def moveToGPU(self,arrayList):
-        
-        numArrays = len(arrayList)
-        
-        tArray = tf.TensorArray(
-            dtype = DATATYPE, 
-            size = numArrays, 
-            dynamic_size = False,
-            clear_after_read = False)
-        
-        for i in range(numArrays):
+
             
-            tArray = tArray.write(i, tf.constant(arrayList[i], dtype = DATATYPE))
-        
-        return tArray
-    
-    def getInitCamParams(self):
-        return self.cameraParameterVector
-    
-    def getInitProjParams(self):
-        return self.projectorParameterVector
-    
-    def getInitExtParams(self):
-        return self.extrinsicParameterVector
-    
-    def getInitParams(self):
-        return self.cameraParameterVector,self.projectorParameterVector,self.extrinsicParameterVector
-    
     def getInput(self):
         cOut = tf.transpose(self.cPoints.concat())
         pOut = tf.transpose(self.pPoints.concat())

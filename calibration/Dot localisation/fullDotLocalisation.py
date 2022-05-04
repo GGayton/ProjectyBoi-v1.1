@@ -5,11 +5,12 @@ import numpy as np
 import os
 import sys
 
+assert os.path.basename(os.getcwd()) == "dot localisation"
 if r"..\\..\\" not in sys.path: sys.path.append(r"..\\..\\")
+if os.getcwd() not in sys.path: sys.path.append(os.getcwd())
 
 from commonlib.file_finder import list_dir
 from commonlib.h5py_functions import trydel
-
 from DotLocalisation import DotLocalisation
 #%% Choose datatsets
 
@@ -33,7 +34,7 @@ with h5py.File(board_filename, 'r') as f:
     board = f["board"][()]
 
 #%% localise all points
-for i in range(3):#len(raw_list)):
+for i in range(12,20):#len(raw_list)):
     
     print('=== {:02d} ==='.format(i))
     
@@ -56,34 +57,35 @@ for i in range(3):#len(raw_list)):
     
     with h5py.File(output_filename, 'a') as f:
         
-        string = "{:02d}".format(i)
+        string = r"inputs/{:02d}".format(i)
         
-        if string+r"\\camera\\points" in f.keys():
+        if string+r"/camera/points" in f.keys():
             
-            trydel(f,string+r"\\camera\\points")
-            trydel(f,string+r"\\camera\\A")
-            trydel(f,string+r"\\camera\\B")
-            trydel(f,string+r"\\camera\\theta")
-            trydel(f,string+r"\\camera\\sigma")
-            trydel(f,string+r"\\camera\\sigmaStd")
-            trydel(f,string+r"\\camera\\covariance")
-            trydel(f,string+r"\\projector\\points")
-            trydel(f,string+r"\\projector\\covariance")
-            trydel(f,string+r"\\board\\points")
+            trydel(f,string+r"/camera/points")
+            trydel(f,string+r"/camera/A")
+            trydel(f,string+r"/camera/B")
+            trydel(f,string+r"/camera/theta")
+            trydel(f,string+r"/camera/sigma")
+            trydel(f,string+r"/camera/sigmaStd")
+            trydel(f,string+r"/camera/covariance")
+            trydel(f,string+r"/camera/artefact")
+
+            trydel(f,string+r"/projector/points")
+            trydel(f,string+r"/projector/covariance")
+            trydel(f,string+r"/projector/artefact")
             
-        f.create_dataset(string+r"\\camera\\points", data=cParams[:,:2], compression='lzf')
-        f.create_dataset(string+r"\\camera\\A", data=cParams[:,2])  
-        f.create_dataset(string+r"\\camera\\B", data=cParams[:,3])  
-        f.create_dataset(string+r"\\camera\\theta", data=cParams[:,4])
-        f.create_dataset(string+r"\\camera\\sigma", data=sigma)  
-        f.create_dataset(string+r"\\camera\\sigmaStd", data=sigmaStd)
-        f.create_dataset(string+r"\\camera\\covariance", data=V, compression='lzf')
+        f.create_dataset(string+r"/camera/points", data=cParams[:,:2], compression='lzf')
+        f.create_dataset(string+r"/camera/A", data=cParams[:,2])  
+        f.create_dataset(string+r"/camera/B", data=cParams[:,3])  
+        f.create_dataset(string+r"/camera/theta", data=cParams[:,4])
+        f.create_dataset(string+r"/camera/sigma", data=sigma)  
+        f.create_dataset(string+r"/camera/sigmaStd", data=sigmaStd)
+        f.create_dataset(string+r"/camera/covariance", data=V, compression='lzf')
+        f.create_dataset(string+r"/camera/artefact", data=board, compression='lzf')
 
-        f.create_dataset(string+r"\\projector\\points", data=pParams[:,:2], compression='lzf')  
-        f.create_dataset(string+r"\\projector\\covariance", data=W, compression='lzf')
-
-        f.create_dataset(string+r"\\board\\points", data=board, compression='lzf')
-
+        f.create_dataset(string+r"/projector/points", data=pParams[:,:2], compression='lzf')  
+        f.create_dataset(string+r"/projector/covariance", data=W, compression='lzf')
+        f.create_dataset(string+r"/projector/artefact", data=board, compression='lzf')
     
     print('==========')
 

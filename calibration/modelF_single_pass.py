@@ -1,10 +1,11 @@
+#%% imports
 import tensorflow as tf
 import numpy as np
-import time
-import sys
-import os
 import h5py
 import matplotlib.pyplot as plt
+import sys
+
+if "..\\" not in sys.path:sys.path.append("..\\")
 
 options = {
     'layout_optimizer': True, 
@@ -19,44 +20,42 @@ options = {
 }
 tf.config.optimizer.set_experimental_options(options)
 
-DATATYPE = tf.float64
-
-currentDir = os.getcwd()
-cutoff = currentDir.find("ProjectyBoy2000")
-assert cutoff != -1
-home = currentDir[:cutoff+16]
-
-if home not in sys.path:sys.path.append(home)
-if home+"Calibration" not in sys.path:sys.path.append(home+"Calibration")
-
-from ModelF import NonLinearCalibration,InputData
-from seperationIndex import seperationIndex
-from common import commonInputs, weightedRegressionCov,robustRegressionCov,regressionCov
+# from ModelF import NonLinearCalibration,InputData
+# from seperationIndex import seperationIndex
+# from common import commonInputs, weightedRegressionCov,robustRegressionCov,regressionCov
+from calib.input_data import InputDataTF
 
 #%%
 dataset = "2022_02_24"
-datasetFilename =  home + r"Calibration\Data\\" + dataset + r"\\Inputs\dotsCorrected.hdf5"
-boardFilename =  home + r"Calibration\Data\\" + dataset + r"\\Inputs\board.hdf5"
-estimateFilename = home + r"Calibration\Data\\" + dataset + r"\\Parameter outputs\\modelA_seed.hdf5"
+dataset_filename =  r"data\\" + dataset + r"\\Inputs\dotsTest.hdf5"
+estimate_filename = r"data\\" + dataset + r"\\Parameter outputs\\modelA_seed.hdf5"
 
 print("==========")
 print("Using:")
 print("Dataset:    ...", dataset)
-print("Dots:       ...", datasetFilename[-30:])
-print("Board:      ...", boardFilename[-30:])
-print("Estimate:   ...", estimateFilename[-30:])
+print("Dots:       ...", dataset_filename[-30:])
+print("Estimate:   ...", estimate_filename[-30:])
 print("==========")
 
 #%% initialise input data structure
 
-inputData = InputData()
-
-I = seperationIndex()
+inputdata = InputDataTF()
 
 #Load all data
-inputData.loadBoardPoints(boardFilename, I)
-inputData.loadMeasuredPoints(datasetFilename, I)
-inputData.loadEstimate(estimateFilename, 0)
+inputdata.load_inputs(dataset_filename)
+out = inputdata.get_inputs()
+
+#%% test cell
+from calib.serial import SerialCalibration
+import time
+
+c = SerialCalibration()
+
+
+#%%
+
+
+#%%
 
 cBoardInput, pBoardInput, camInput, projInput = inputData.getInput1D()
 initCamParams = inputData.getInitCamParams()
