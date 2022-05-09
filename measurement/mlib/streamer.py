@@ -7,21 +7,18 @@ from PySide2.QtWidgets import (
     )
 from PySide2.QtGui import (
     QPainter,
-    QPen,
-    QPixmap)
+    QPen
+    )
 from PySide2.QtCore import (
     Qt,
     Signal,
     Slot,
     )
+
 import numpy as np
-from commonlib.common_functions import (
-    rescale_to_uint8,
-    get_img_from_fig
-    )
-from commonlib.common_qt_functions import (
-    array_to_QPixmap
-    )
+from commonlib.typecasting import rescale_to_uint8
+from commonlib.imaging import get_img_from_fig
+from commonlib.qt_functions import array_to_QPixmap
 import cv2
 import matplotlib.pyplot
 

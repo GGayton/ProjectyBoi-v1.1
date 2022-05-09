@@ -63,7 +63,8 @@ class CameraControl(QObject):
             "Width": 5120,
             "AcquisitionMode": "SingleFrame"
             }
-                           
+    
+    #Set up common parameters                       
     def setup_camera(self, cam: Camera):
         with cam:
             # Try to adjust GeV packet size. This Feature is only available for GigE - Cameras.
@@ -75,7 +76,7 @@ class CameraControl(QObject):
         
             except (AttributeError, VimbaFeatureError):
                 pass
-            
+    #copy pasted API example to get camera instances         
     def get_camera(self, camera_id):
         with Vimba.get_instance() as vimba:
             if camera_id:
@@ -91,7 +92,8 @@ class CameraControl(QObject):
                     raise Exception('No Cameras accessible. Abort.')
     
                 return cams[0]
-                
+     
+    #set the camera modes
     def set_mode(self, cam, setting_list):
         
         #Set settings
@@ -188,7 +190,7 @@ class CameraControl(QObject):
                             break
                             
                         print("Camera:         Acquired image {:02d}".format(i))
-                        print(frame)
+                        # print(frame)
                         
                         #Convert frame
                         frame.convert_pixel_format(PixelFormat.Mono16)

@@ -3,3 +3,4 @@ numpy
 scipy
 hdf5
 queue
+open3d
