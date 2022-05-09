@@ -2,11 +2,11 @@ import sys
 import h5py
 import numpy as np
 import cv2
-import matplotlib
+import matplotlib.pyplot as plt
 
 if "..\\" not in sys.path:sys.path.append("..\\")
 
-from clib.Model import Measurement
+from clib.model import Measurement
 from clib.decoding import Decode
 from commonlib.directory import recursive_file_list_finder
 from commonlib.pixel_selector import define_area_ocv as define_area
@@ -24,12 +24,12 @@ uinput = input('Crop area? y/n')
 if uinput == 'y':mask = define_area(image)
 else: mask = np.ones_like(image, dtype = bool)
 #%% Choose model
-parameterFilename = "parameters//modelParameters.hdf5"
+parameterFilename = "parameters//model_parameters.hdf5"
 
 #%% Convert decoded images to 3D points
 
 system = Measurement('Y')
-system.inputP.loadParameters(parameterFilename)
+system.inputP.load_parameters(parameterFilename)
 
 decode = Decode()
 freq = [1/19, 1/21, 1/23]
@@ -45,9 +45,9 @@ for dataset in filename_list:
     
     xyz += system.getPointCloud()
 
-fig = matplotlib.pyplot.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(xyz[0][::1003,0],xyz[0][::1003,1],xyz[0][::1003,2], s=5, c=xyz[0][::1003,2])
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# ax.scatter(xyz[0][::1003,0],xyz[0][::1003,1],xyz[0][::1003,2], s=5, c=xyz[0][::1003,2])
 
 plot_pointcloud(xyz)
 
