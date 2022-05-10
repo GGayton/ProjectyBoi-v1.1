@@ -73,5 +73,3 @@ with h5py.File(filename, 'w-') as f:
             extrinsic_string = name + r"/extrinsic//" + pose_id
             f.create_dataset(extrinsic_string + r"/rotation", data=ext_r[name][pose_id])
             f.create_dataset(extrinsic_string + r"/translation", data=ext_t[name][pose_id])
-
-# %%

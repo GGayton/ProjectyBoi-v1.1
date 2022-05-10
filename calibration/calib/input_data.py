@@ -87,7 +87,7 @@ class InputData():
         
         #Obtain keys
         with h5py.File(filename, 'r') as f:
-            temp_keys = list(f.keys)
+            temp_keys = list(f.keys())
 
         #Either store keys, or check they are consistent
         self.checkstore_keys(temp_keys)
@@ -105,11 +105,16 @@ class InputData():
                 self.params[key]["rotation"] = f[key]["rotation"][()]
                 self.params[key]["translation"] = f[key]["translation"][()]
 
-                self.params[key]["rotation"] = f[key]["rotation"][()]
-                self.params[key]["rotation"] = f[key]["rotation"][()]
+                self.params[key]["extrinsic"] = {}
+                self.params[key]["extrinsic"]["rotation"] = {}
+                self.params[key]["extrinsic"]["translation"] = {}
 
+                for pose_id in f[key]["extrinsic"].keys():
 
-
+                    self.params[key]["extrinsic"]["rotation"][pose_id] =\
+                        f[key]["extrinsic"][pose_id]["rotation"][()]
+                    self.params[key]["extrinsic"]["translation"][pose_id] =\
+                        f[key]["extrinsic"][pose_id]["translation"][()]
 
     @staticmethod
     def check_list(list1,list2):
