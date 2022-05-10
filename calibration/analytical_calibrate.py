@@ -53,43 +53,22 @@ for i in range(num_cameras):
 #%% obtain extrinsics guess
 extrinsic_r,extrinsic_t = calib.estimate_extrinsics(r,t)
 
-#%% Assemble
+#%% Reprojection errors
 
-def assembleVec(K, r, t):
-    
-    #Assemble parameter vector
-    X = np.empty((5 + 6*t.shape[1]))
-    
-    X[0] = K[0,0]
-    X[1] = K[1,1]
-    X[2] = K[0,1]
-    X[3] = K[0,2]
-    X[4] = K[1,2]
-    
-        
-    for i in range(t.shape[1]):
-        
-        extrinsic = np.concatenate((r[:,i], t[:,i]), axis=0)
-        
-        X[i*6+5:(i+1)*6+5] = extrinsic
-        
-    return X
-
-camParams = assembleVec(iKc, irc, itc)
-projParams = assembleVec(iKp, irp, itp)
-extParams = np.concatenate((ir,it))
-
-#%% save approximation
-
-filename = home + r"Calibration\Data\\" + dataset + r"\\Parameter outputs\approx_seed.hdf5"
+#%% save
+names = inputdata.keys
+filename = r"data\\" + dataset + r"\\parameter outputs\approx.hdf5"
 with h5py.File(filename, 'w-') as f:
 
-        f.create_group("camera")
-        f.create_group("projector")
-        f.create_group("extrinsic")
-        
-        f.create_dataset("/camera/array", data=camParams)
-        f.create_dataset("/projector/array", data=projParams)
-        f.create_dataset("/extrinsic/array", data=extParams)
+        for i in range(len(names)):
+            
+            temp = K[i][[0,1,0,0,1],[0,1,1,2,2]]
+            f.create_dataset(names[i] + r"/matrix", data=temp)
+            f.create_dataset(names[i] + r"/rotation", data=r[i])
+            f.create_dataset(names[i] + r"/translation", data=t[i])
 
+            
+            f.create_dataset("/extrinsic//" + names[i]+ r"/rotation", data=extrinsic_r[i])
+            f.create_dataset("/extrinsic//" + names[i]+ r"/translation", data=extrinsic_t[i])
 
+# %%

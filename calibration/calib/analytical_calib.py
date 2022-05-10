@@ -198,6 +198,8 @@ class AnalyticalCalibration():
         num_cameras = len(r)
         R = [[] for _ in range(num_cameras)]
         T = [[] for _ in range(num_cameras)]
+        R[0] = np.array([0,0,0])
+        T[0] = np.array([0,0,0])
 
         for i in range(1,num_cameras):
 

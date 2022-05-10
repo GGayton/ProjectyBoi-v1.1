@@ -80,6 +80,7 @@ would access the 4th pose 3d artefact points on the component labelled "upside-d
 
 The Levenberg-Marquardt algorithm (serial calibration) requires an estimation, which is provided using
 calibration\analytical_calibrate.py.
+
 ===============================================================
 HARDWARE CONSIDERATIONS
 ===============================================================
