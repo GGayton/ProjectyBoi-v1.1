@@ -7,16 +7,20 @@ class InputData():
     
     def __init__(self, datatype=tf.float64):
         self.datatype = datatype
+        self.keys = None
 
     def load_inputs(self, filename):
         self.num_positions = num_of_keys(filename, "inputs")
         with h5py.File(filename, 'r') as f:
             
             #Identify all components by their second level key
-            self.keys = list(f["inputs"]["00"].keys())
+            temp_keys = list(f["inputs"]["00"].keys())
             for key in f["inputs"].keys():
                 for ckey in f["inputs"][key].keys():
-                    if ckey not in self.keys: self.keys.append(ckey)
+                    if ckey not in temp_keys: temp_keys.append(ckey)
+
+            #Either store keys, or check they are consistent
+            self.checkstore_keys(temp_keys)
 
             #initialise the point dictionary
             self.points = {}
@@ -65,72 +69,59 @@ class InputData():
             art[i] = art_set
         
         return out,art
-
-    def loadEstimate(self, filename, nDist):
-        
-        with h5py.File(filename, 'r') as f:
-            
-            camArray = f[r"/camera/array"][()]
-            projArray = f[r"/projector/array"][()]
-            extArray = f[r"/extrinsic/array"][()]
-            
-        camArray = np.concatenate((camArray[:5], np.ones(nDist)*0.1, camArray[5:]))
-        projArray = np.concatenate((projArray[:5], np.ones(nDist)*0.1, projArray[5:]))
-            
-        self.cameraParameterVector = tf.Variable(camArray.flatten(), dtype = DATATYPE)
-        self.projectorParameterVector = tf.Variable(projArray.flatten(), dtype = DATATYPE)
-        self.extrinsicParameterVector = tf.Variable(extArray.flatten(), dtype = DATATYPE)
-                
-    def loadParametersFromSeed(self,filename):
-        
-        with h5py.File(filename, 'r') as f:
-            
-            camArray = f[r"/camera/array"][()]
-            projArray = f[r"/projector/array"][()]
-            extArray = f[r"/extrinsic/array"][()]
-            
-        self.cameraParameterVector = tf.Variable(camArray.flatten(), dtype = DATATYPE)
-        self.projectorParameterVector = tf.Variable(projArray.flatten(), dtype = DATATYPE)
-        self.extrinsicParameterVector = tf.Variable(extArray.flatten(), dtype = DATATYPE)
-        
-    def loadBoardPoints(self, filename):
-        
-        with h5py.File(filename, 'r') as f:
-            
-            board = f["board"][:,:]
-            
-        f.close()
-        
-        if board.shape[1] == 2:
-            board = np.concatenate((board, np.zeros_like(board[:,0:1])), axis=1)
-        board = board.astype(np.float64)
-            
-        self.setBoardPoints(board)
-        
-    def loadMeasuredPoints(self, filename):
-                
-        num_of_positions = num_of_keys(filename, "camera/points")
-        
-        cPoints = []
-        pPoints = []
-                
-        with h5py.File(filename, 'r') as f:
-            
-            ones = np.ones((184,1))
-            
-            for i in range(0,num_of_positions):
-                
-                string = "{:02d}".format(i)
-                                
-                cPoints.append(
-                    np.concatenate((f["camera/points"][string][:,:].astype(np.float64), ones), axis=1))
-                pPoints.append(
-                    np.concatenate((f["projector/points"][string][:,:].astype(np.float64), ones), axis=1))
-        
-        f.close()
     
-        self.setProjectorPoints(pPoints)
-        self.setCameraPoints(cPoints)
+    def get_inputs_dict(self):
+        return self.points,self.artefact
+
+    def get_pose_IDs(self):
+
+        assert self.keys!=None, "You must load the inputs first."
+
+        out = {}
+        for key in self.keys:
+            out[key] = list(self.points[key].keys())
+
+        return out
+
+    def load_estimate(self, filename):
+        
+        #Obtain keys
+        with h5py.File(filename, 'r') as f:
+            temp_keys = list(f.keys)
+
+        #Either store keys, or check they are consistent
+        self.checkstore_keys(temp_keys)
+
+        #Initialise parameter dict
+        self.params = {}
+        for key in self.keys:
+            self.params[key] = {}
+
+        #Load all parameters
+        with h5py.File(filename, 'r') as f:
+            for key in self.keys:
+                self.params[key]["matrix"] = f[key]["matrix"][()]
+                self.params[key]["distortion"] = f[key]["distortion"][()]
+                self.params[key]["rotation"] = f[key]["rotation"][()]
+                self.params[key]["translation"] = f[key]["translation"][()]
+
+                self.params[key]["rotation"] = f[key]["rotation"][()]
+                self.params[key]["rotation"] = f[key]["rotation"][()]
+
+
+
+
+    @staticmethod
+    def check_list(list1,list2):
+        return sorted(list1) == sorted(list2)
+
+    def checkstore_keys(self,temp_keys):
+        if self.keys==None:
+            self.keys = temp_keys
+        else:
+            assert self.check_list(temp_keys, self.keys), \
+            "There is a mismatch in the keys already realised - to reset, set self.keys=None."
+
 
 
             

@@ -117,11 +117,12 @@ class AnalyticalCalibration():
     
         #Estimate intrinsic parameters
         V = np.empty((2*positionsNum, 6))
+        keys = list(H.keys())
         for i in range(0,positionsNum):
             
-            v11 = self.assemble_V(H[i],0,0)
-            v12 = self.assemble_V(H[i],0,1)
-            v22 = self.assemble_V(H[i],1,1)
+            v11 = self.assemble_V(H[keys[i]],0,0)
+            v12 = self.assemble_V(H[keys[i]],0,1)
+            v22 = self.assemble_V(H[keys[i]],1,1)
             
             V[2*i,:] = v12.T
             V[2*i+1,:] = (v11 - v22).T
@@ -158,11 +159,11 @@ class AnalyticalCalibration():
         
         A_inv = np.linalg.inv(A)
         
-        tList = np.empty((3,positionsNum))
-        rList = np.empty((3,positionsNum))
+        ext_t = {}
+        ext_r = {}
         for i in range(positionsNum):
-            r1 = A_inv @ H[i][:,0:1]
-            r2 = A_inv @ H[i][:,1:2]
+            r1 = A_inv @ H[keys[i]][:,0:1]
+            r2 = A_inv @ H[keys[i]][:,1:2]
             
             _lambda = (np.sum(r1**2))**0.5
             
@@ -174,54 +175,84 @@ class AnalyticalCalibration():
             
             R = approximate_matrix_as_R(Q)
             
-            t = A_inv @ H[i][:,2]/_lambda
+            t = A_inv @ H[keys[i]][:,2]/_lambda
             
-            tList[:,i] = t
-            rList[:,i] = rodriguesInv(R)     
+            ext_t[keys[i]] = t
+            ext_r[keys[i]] = rodriguesInv(R)     
             
-        return A, tList, rList
+        return A, ext_t, ext_r
     
     def calibrate(self,object_points,camera_points,inv_fx=False,inv_fy=False):
         
         assert len(object_points) == len(camera_points), "Missing camera or object points."
 
         #Estimate Homography
-        H = []
-        for i in range(len(camera_points)):
-            H.append(self.homography(object_points[i], camera_points[i]))
+        H = {}
+        for key in camera_points.keys():
+            H[key] = self.homography(object_points[key], camera_points[key])
             
         #Get parameters
         return self.get_parameters(H, inv_fx = inv_fx, inv_fy = inv_fy) 
     
-    def estimate_extrinsics(self,r,t):
+    def estimate_extrinsics(self,r,t,primary):
+
+        assert primary in list(r.keys()), "Origin component not in rotations"
+        assert primary in list(t.keys()), "Origin component not in translations"
 
         num_cameras = len(r)
-        R = [[] for _ in range(num_cameras)]
-        T = [[] for _ in range(num_cameras)]
-        R[0] = np.array([0,0,0])
-        T[0] = np.array([0,0,0])
+        t_out = {} 
+        r_out = {}
+        t_out[primary] = np.array([0,0,0])
+        r_out[primary] = np.array([0,0,0])
 
-        for i in range(1,num_cameras):
+        component_list = list(r.keys())
+        component_list.remove(primary)
+        
+        primary_pose_IDs = list(r[primary].keys())
 
-            R[i],T[i] = self.estimate_extrinsic(r[0],t[0],r[i],t[i])
+        for comp in component_list:
+            
+            secondary_pose_IDs = list(r[comp].keys())
+            common_IDs = self.common_pose_IDs(primary_pose_IDs, secondary_pose_IDs)
 
-        return R,T
+            primary_r = []
+            primary_t = []
+            secondary_r = []
+            secondary_t = []
+
+            for id in common_IDs:
+                primary_r += [r[primary][id]]
+                primary_t += [t[primary][id]]
+                secondary_r += [r[comp][id]]
+                secondary_t += [t[comp][id]]
+
+            r_out[comp],t_out[comp] = self.estimate_extrinsic(
+                primary_r,
+                primary_t,
+                secondary_r,
+                secondary_t)
+
+        return r_out,t_out
+
+    @staticmethod
+    def common_pose_IDs(list1, list2):
+        return list(set(list1).intersection(list2))
 
     def estimate_extrinsic(self,rc,tc,rp,tp):
         
-        positionsNum = tc.shape[1]
+        positions_num = len(tc)
         
-        r_out = np.empty((3,positionsNum))
-        t_out = np.empty((3,positionsNum))
+        r_out = np.empty((3,positions_num))
+        t_out = np.empty((3,positions_num))
         
-        for i in range(tc.shape[1]):
+        for i in range(positions_num):
             
-            Rc = rodrigues(rc[:,i:i+1])
-            Rp = rodrigues(rp[:,i:i+1])
+            Rc = rodrigues(rc[i])
+            Rp = rodrigues(rp[i])
             
             r_out[:,i] = rodriguesInv(Rp @ Rc.T)
-            
-            t_out[:,i:i+1] = tp[:,i:i+1] - Rp@Rc.T@tc[:,i:i+1]
+
+            t_out[:,i:i+1] = tp[i].reshape(3,1) - Rp@Rc.T@tc[i].reshape(3,1)
                 
         r_out = np.mean(r_out, axis=1)
         t_out = np.mean(t_out, axis = 1)

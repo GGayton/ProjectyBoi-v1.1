@@ -23,27 +23,27 @@ tf.config.optimizer.set_experimental_options(options)
 # from ModelF import NonLinearCalibration,InputData
 # from seperationIndex import seperationIndex
 # from common import commonInputs, weightedRegressionCov,robustRegressionCov,regressionCov
-from calib.input_data import InputDataTF
+from calib.input_data import InputData
 
 #%%
 dataset = "2022_02_24"
 dataset_filename =  r"data\\" + dataset + r"\\Inputs\dotsTest.hdf5"
 estimate_filename = r"data\\" + dataset + r"\\Parameter outputs\\modelA_seed.hdf5"
 
-print("==========")
+print("="*30)
 print("Using:")
 print("Dataset:    ...", dataset)
 print("Dots:       ...", dataset_filename[-30:])
 print("Estimate:   ...", estimate_filename[-30:])
-print("==========")
+print("="*30)
 
 #%% initialise input data structure
 
-inputdata = InputDataTF()
+inputdata = InputData()
 
 #Load all data
 inputdata.load_inputs(dataset_filename)
-out = inputdata.get_inputs()
+out = inputdata.get_inputs_TF()
 
 #%% test cell
 from calib.serial import SerialCalibration
