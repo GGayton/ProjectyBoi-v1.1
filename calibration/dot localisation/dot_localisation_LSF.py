@@ -11,7 +11,7 @@ from commonlib.solver import NonLinearSolver, LinearSolver
 from commonlib.console_outputs import ProgressBar
 from commonlib.plotting import plotErrorEllipse
 
-from defineEllipseJacobian import defineEllipseJacobian
+from define_ellipse_jacobian import defineEllipseJacobian
 
 
 class DotLocalisation():

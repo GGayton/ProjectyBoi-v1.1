@@ -11,7 +11,7 @@ if os.getcwd() not in sys.path: sys.path.append(os.getcwd())
 
 from commonlib.file_finder import list_dir
 from commonlib.h5py_functions import trydel
-from DotLocalisation import DotLocalisation
+from dot_localisation_LSF import DotLocalisation
 #%% Choose datatsets
 
 dataset = "2022_02_24"

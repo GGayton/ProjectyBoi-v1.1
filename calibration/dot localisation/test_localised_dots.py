@@ -15,13 +15,11 @@ if home+"Calibration" not in sys.path: sys.path.append(home+"Calibration")
 if home+"Calibration\Dot localisation v2" not in sys.path: sys.path.append(home+"Calibration\Dot localisation v2")
 if home+"Phase decoding" not in sys.path:sys.path.append(home+"Phase decoding")
 
-from DotLocalisation import DotLocalisation
-
-from Decoding import Decode
+from dot_localisation_LSF import DotLocalisation
 
 from commonlib.h5py_functions import load_h5py_arrays, tryDel, num_of_keys
 
-from commonlib.common_functions import listdir
+from commonlib.directory import list_dir
 
 from scipy.stats import lognorm
 
