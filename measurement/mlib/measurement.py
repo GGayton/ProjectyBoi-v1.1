@@ -1,19 +1,20 @@
+#%% imports
 from PySide2.QtCore import (
-    QMutex,
-    QTimer,
     QObject,
     Signal,
     Slot,
     )
 
-from commonlib.common_functions import convert_float_to_uint8_image
-from commonlib.common_qt_functions import array_to_QPixmap
+from commonlib.typecasting import convert_float_to_uint8_image
+from commonlib.qt_functions import array_to_QPixmap
 from commonlib.console_outputs import ProgressBar
 
-import os
+
 import numpy as np
 import time
 import h5py
+
+#%%
 
 class TaskManager(QObject):
     
@@ -45,27 +46,29 @@ class TaskManager(QObject):
     def __init__(self, finish_cond, projector_queue, projector_cond, camera_cond):
         super().__init__()
         
+        #Queues for passing data between threads
         self.projector_queue = projector_queue
         self.camera_cond = camera_cond
         self.projector_cond = projector_cond
         self.finish_cond = finish_cond
         
+        #Number of proj/cam image pairs to be taken in single measurement
         self.N = None
         
+        #Stack of images to be projected
         self.image_stack = None
         
-        self.nth_image = 0
-                
-        # self.minVal = np.nonzero(self.gammaLUT)[0][0]
-        # self.maxVal = np.nonzero(self.gammaLUT)[0][-1]
-        self.minVal = 0
-        self.maxVal = 0
         
+        self.nth_image = 0
+        
+        #Set image range
         self.minVal = 0
         self.maxVal = 255
         
+        #number of warmup images to take
         self.warm_up_N = 10
         
+        #Number of camera image repeats per projector image
         self.repetitions = 1
         
     @Slot(str)

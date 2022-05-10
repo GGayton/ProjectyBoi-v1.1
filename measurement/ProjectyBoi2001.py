@@ -1,5 +1,9 @@
+#%% Imports
 import os
 import queue
+import sys
+
+if r"..\\" not in sys.path: sys.path.append(r"..\\")
 
 from PySide2.QtWidgets import (
     QApplication,
@@ -21,22 +25,26 @@ from PySide2.QtCore import (
     Slot,
     )
 
-from commonlib.projector import ProjectorControl
-from commonlib.streamer import ViewWindow
-from commonlib.camera import CameraControl
-from commonlib.saver import ImageSaver
-from commonlib.measurement import TaskManager
-#%% Control window
+from mlib.projector import ProjectorControl
+from mlib.streamer import ViewWindow
+from mlib.camera import CameraControl
+from mlib.saver import ImageSaver
+from mlib.measurement import TaskManager
+#%% Class
+
 class ControlWindow(QMainWindow):
     
     """
-    Provides the GUI for the user to select certain parameters (what images to use etc)
+    Provides the GUI for the user to select certain parameters (what images to 
+    use etc)
     
     All the signals/slot connections are conected outside the class
     
-    In Qt, the main GUI has to exist in the main thread. Im not entirely sure what that means but this seems to work.
+    In Qt, the main GUI has to exist in the main thread. Im not entirely sure 
+    what that means but this seems to work.
     
-    There are a lot of deprecated functions/signals and slots etc. I haven't cleaned them up, so if you think they do nothing chances are they do nothing.
+    There are a lot of deprecated functions/signals and slots etc. I haven't 
+    cleaned them up, so if you think they do nothing chances are they do nothing.
     """
     
     update_images_signal = Signal(str)
@@ -75,7 +83,7 @@ class ControlWindow(QMainWindow):
         init_measurement.setObjectName("init_measurement")
                
         #Find the regime types
-        regime_file_dir = self.current_directory + '\\Projection Regimes\\Regimes'
+        regime_file_dir = self.current_directory + '\\projection regimes'
         regime_list = os.listdir(regime_file_dir)
         
         #Create regime control
@@ -87,7 +95,7 @@ class ControlWindow(QMainWindow):
                 regime_control.addItem(regime)
             
         #Repeat num
-        text1 = QLabel("Set repeats:")
+        text1 = QLabel("Number of camera images per projector image:")
         repeat = QSpinBox()
         repeat.setRange(1,500)
         repeat.setSingleStep(1)
@@ -98,9 +106,10 @@ class ControlWindow(QMainWindow):
 
         vbox.addWidget(init_measurement)
         vbox.addWidget(regime_control)
+        vbox.addStretch(1)
         vbox.addWidget(text1)
         vbox.addWidget(repeat)
-        vbox.addStretch(1)
+
         
         measurement_box.setLayout(vbox)
         
@@ -169,7 +178,7 @@ class ControlWindow(QMainWindow):
         return preparation_box
 
     def create_repeat_box(self):
-        camera_box = QGroupBox("Repeat measurements")
+        camera_box = QGroupBox("Repeated measurements")
         camera_box.setObjectName("repeat")
 
         start = QPushButton("Take N measurements")
@@ -205,7 +214,7 @@ class ControlWindow(QMainWindow):
     def define_regime_directory(self, regime_directory):
         
         #List all images
-        directory = self.current_directory + '\\Projection Regimes\\Regimes\\' + regime_directory
+        directory = self.current_directory + '\\projection regimes\\' + regime_directory
         
         print("Loading from:      [",directory,"]")
                
@@ -261,7 +270,7 @@ if __name__ == "__main__":
     image_saver = ImageSaver(
         camera_queue, 
         finish_cond,
-        os.path.dirname(os.path.realpath(__file__)) + "\\Measurements\\"
+        "..\\measurement images\\"
         )
     
     task_manager= TaskManager(
@@ -294,18 +303,19 @@ if __name__ == "__main__":
     control_window.centralWidget().findChild(QPushButton, "init_measurement").\
         clicked.connect(task_manager.measurement)
         
-    #Repetition
+    #Measuring, but taking repeated measurement of the same object
     control_window.centralWidget().findChild(QSpinBox, "repeat_num").\
         valueChanged[int].connect(task_manager.set_repetitions)
     control_window.centralWidget().findChild(QPushButton, "init_repeats").\
         clicked.connect(task_manager.repeat_measurement)
         
-        
+    #Set regime
     control_window.centralWidget().findChild(QComboBox, "regime_control").\
         activated[str].connect(control_window.define_regime_directory)
     control_window.update_images_signal.\
         connect(task_manager.load_in_images)
-        
+    
+    #Measurement chain
     task_manager.project_N_images_signal.\
         connect(projector_control.project_N_images)
     task_manager.acquire_N_images_signal.\
@@ -321,11 +331,13 @@ if __name__ == "__main__":
     control_window.centralWidget().findChild(QPushButton, "init_streaming").\
         clicked.connect(viewing_window.toggle_stream_window)
     
+    #for projecting specific images
     control_window.centralWidget().findChild(QPushButton, "project_nth_image").\
         clicked.connect(task_manager.project_nth_image)
     control_window.centralWidget().findChild(QSpinBox, "set_nth_image").\
         valueChanged[int].connect(task_manager.set_nth_image)
-
+        
+    #streaming window measurement chain
     viewing_window.start_streaming_signal.\
         connect(camera_control.start_streaming)
     viewing_window.stop_streaming_signal.\
@@ -335,7 +347,7 @@ if __name__ == "__main__":
     viewing_window.clear_camera_cond_signal.\
         connect(camera_control.clear_camera_cond)
     
-    
+    #repeated camera images for every projector image
     control_window.centralWidget().findChild(QSpinBox, "repeat_camera_images").\
         valueChanged[int].connect(camera_control.set_repeat_images)
     control_window.centralWidget().findChild(QSpinBox, "repeat_camera_images").\
@@ -347,7 +359,6 @@ if __name__ == "__main__":
     control_window.centralWidget().findChild(QPushButton, "init_warm_up").\
         clicked.connect(task_manager.warm_up)
         
-
     app.exec_()
     
     print("Goodbye")

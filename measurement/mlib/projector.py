@@ -31,8 +31,8 @@ class ProjectorControl(QWidget):
         self.current_directory = os.path.dirname(os.path.realpath(__file__))
         
         #Load images
-        self.home_image = QPixmap("Home_screen.png")
-        self.target_image = QPixmap("Target_screen.png")
+        self.home_image = QPixmap("home_screen.png")
+        self.target_image = QPixmap("target_screen.png")
                       
         #Create the image label
         self.label = QLabel()

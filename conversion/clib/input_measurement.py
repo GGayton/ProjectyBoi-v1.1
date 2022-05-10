@@ -1,10 +1,8 @@
-from clib.Common import Common
 import numpy as np
 
-class InputMeasurement(Common):  
+class InputMeasurement():  
     
     def __init__(self,cov=None,camRes=(5120,5120),useCUDA=False):
-        super().__init__(useCUDA)
         
         self.useCUDA = useCUDA
         if useCUDA: import cupy as xp
@@ -23,7 +21,7 @@ class InputMeasurement(Common):
                 
     def updateMapIndex(self,newIndex):
         xp = self.xp
-        self.mapIndex = xp.logical_and(self.mapIndex, self.go(newIndex))
+        self.mapIndex = xp.logical_and(self.mapIndex, newIndex)
         self.formVectors()
                    
     def setXMeasurement(self, corrMapIn):
@@ -82,8 +80,8 @@ class InputMeasurement(Common):
             xp.linspace(1,self.corrMap.shape[1],self.corrMap.shape[1]),
             indexing='ij')
                
-        u = u[self.mapIndex].reshape(1,-1)
-        v = v[self.mapIndex].reshape(1,-1)
+        u = u[self.mapIndex].reshape(1,-1) - 1
+        v = v[self.mapIndex].reshape(1,-1) - 1
 
         self.pixelVector = xp.concatenate((u,v,xp.ones_like(u)),axis=0)
         
