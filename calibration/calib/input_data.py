@@ -69,7 +69,7 @@ class InputData():
                 i = np.random.randint(0,184)
 
                 if pose_id in list(self.points[key].keys()):
-                    point_set += [self.points[key][pose_id][:i,:].T.reshape(-1,1)]
+                    point_set += [self.points[key][pose_id][:i,:].reshape(-1,1)]
                     art_set += [self.artefact[key][pose_id][:i,:]]
                 else:
                     point_set += []
@@ -159,9 +159,6 @@ class InputData():
 
         return params
 
-
-
-
     @staticmethod
     def check_list(list1,list2):
         return sorted(list1) == sorted(list2)
@@ -173,14 +170,4 @@ class InputData():
             assert self.check_list(temp_keys, self.keys), \
             "There is a mismatch in the keys already realised - to reset, set self.keys=None."
             
-    def getInput(self):
-        cOut = tf.transpose(self.cPoints.concat())
-        pOut = tf.transpose(self.pPoints.concat())
-                
-        return tf.transpose(self.board),cOut,pOut
-    
-    def getInput1D(self):
-        cOut = self.cPoints.concat()
-        pOut = self.pPoints.concat()
-                
-        return tf.transpose(self.board),tf.reshape(cOut, (-1,1)),tf.reshape(pOut, (-1,1))
+   

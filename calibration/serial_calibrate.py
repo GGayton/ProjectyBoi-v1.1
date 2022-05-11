@@ -44,6 +44,8 @@ inputdata.load_inputs(dataset_filename)
 inputdata.load_estimate(estimate_filename)
 
 points,artefact = inputdata.get_inputs_TF()
+
+# inputdata.params["camera"]["distortion"] = np.zeros(7)
 params = inputdata.get_serial_estimate()
 
 #%% Initialise
@@ -52,20 +54,35 @@ calib = SerialCalibration()
 #%% set hyper parameters
 
 calib.options["damping_factor"] = 10
-calib.options["verbosity"] = 0
+calib.options["verbosity"] = 1
 calib.options["max_iterations"] = 20
 calib.options["min_change"] = 0.0001
 calib.options["max_failure"] = 5
 
 print("="*50)
 print("Hyper parameters:")
-print("options")
+print(calib.options)
 print("="*50)
 
-
 #%%
+# test1 = points["camera"][:artefact["camera"][0].shape[0]*2]
+# test2 = calib.back_project(
+#     tf.transpose(artefact["camera"][0].to_tensor()), 
+#     calib.assemble_camera_matrix(params["camera"][:5]),
+#     calib.rodrigues(params["camera"][12:15]),
+#     tf.reshape(params["camera"][15:18],(3,1)),
+#     params["camera"][5:12])
+# # test2 = tf.reshape(tf.transpose(test2), (-1,1))
+# test2 = tf.reshape(test2, (-1,1))
 
-test = points["camera"] - calib.transform_TF(artefact["camera"], params["camera"])
+# err = test1 - test2
+# plt.close('all')
+# plt.scatter(err[::2], err[1::2],s=3)
+# #%%
+# test = points["camera"] - calib.transform(artefact["camera"], params["camera"])
+
+# plt.close('all')
+# plt.scatter(test[::2], test[1::2],s=3)
 #%% clib
 
 L = 0.95

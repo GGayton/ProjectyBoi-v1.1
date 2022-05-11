@@ -122,7 +122,7 @@ class SerialCalibration(Calibration):
         r,t = tf.split(extrinsics[0], [3,3])
         R = self.rodrigues_TF(r)
         T = tf.reshape(t, (3,1))
-        
+        print(D)
         allEst = R @ tf.transpose(x[0].to_tensor()) + T
         
         #Transform next sets an concatenate onto first
