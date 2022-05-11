@@ -23,7 +23,7 @@ The measurement is completed entirelyu using the QT library, which allows both m
 	initialises and runs all the code necessary, i.e. run ProjectyBoi2001.py 
 	to begin taking measurements.
 
-\measurement\ShowAllMeasurements.py 
+\measurement\show_all_measurements.py 
 	shows all the images taken during a particular measurement.
 
 \measurement\projection regimes
@@ -37,38 +37,53 @@ The measurement modules and their functions are:
  - saver               | save images, check for image failures
  - streamer            | seperate sub-window to view and check images (for aligning objects, checking over exposure etc.)
  - measurement         | macrosync all components together
- - console_outputs     | loading bar
- - common_functions    | common functions 
- - common_qt_functions | numpy->QT array conversion 
 
 ===============================================================
 CONVERSION:
 ===============================================================
 The conversion folder holds the modules and scripts that converts the images captured during the measurement to a 
-point-cloud. The script for this is \conversion\convertToPointCloud.py. Currently, the parameters that define the
-fringe projection system are held in parameters \conversion\parameters\modelParameters.hdf5. These are found during
-the calibration and the calibration code is not yet functional.
+point-cloud. The script for this is \conversion\convert_to_point_cloud.py. Currently, the parameters that define the
+fringe projection system are held in parameters \conversion\parameters\model_parameters.hdf5. These are found during
+the calibration (given in \calibration folder).
+
+The conversion modules and their functions are:
+ - decoding               | decode the images to give camera->projector correspondence
+ - input_measurement      | class to hold the decoded images/perform some filtering
+ - input_parameter        | class to hold the parameters of the system
+ - model                  | object that performs the decoded image-> point-cloud conversion
+ - nonlinear_correction   | performs the distortion correction
 
 ===============================================================
 CALIBRATION:
 ===============================================================
 The calibration is compeleted using tensorflow, which serves to compute the gradient.
 
-First, the inputs to the calibration must be known. \dot localisation houses a method for completing
-this on a dot grid. Other methods not written.
+The calibration modules and their functions are:
+ - analytical_calib       | Analytical calibration used to produce an estimate for the nonlinear regression
+ - base_calib             | class to common calibration functions
+ - input_data             | class to hold the input data to a calibration - reads the hdf5 file holding the data and
+                            prepares data for calibration
+ - serial                 | object that performs the decoded image-> point-cloud conversion
 
-The calibration supports arbitrary numbers of camera/projectors/artefacts, with differing points per pose if need.
+The calibration supports arbitrary numbers of camera/projectors/artefacts, with differing points per pose if needed.
 A pose is defined as a single artefact measured once by any number of cameras/projectors. I.e., a pose
-shares a single rotation and translation estimation of the artefact. Even if you measure 2 dot grids in one image,
+shares a single rotation and translation estimation of the artefact. Iif you measure 2 dot grids in one image,
 that would equate to 2 poses, since they wouldn't share a rotation and translation.
 
-The input hdf5 file hierarchy looks like:
+First, the inputs to the calibration must be known. \dot localisation houses a method for completing
+this on a dot grid. Other methods for differing artefact are not written. Any feature localisation
+method must produce a set of 2D image points, that match the input hdf5 file hierarchy:
 
-0->inputs
-1 ->{2 digit num} (indicate what pose it is)
-2  ->{keyword} (single seperate unique keyword for each component, a component shares distortion/camera matrix parameters)
-3   ->points (The 2D measured points)
-3   ->artefact (The 3D artefact points)
+(a {} implies a user designated phrase, otherwise the key must match, i.e. the first level
+of the .hdf5 file must be "inputs", which allows other data to be stored on the input file)
+
+level | key
+0     | ->inputs
+1     |   ->{2 digit num} (indicate what pose it is)
+2     |     ->{keyword} (single seperate unique keyword for each component, a component is defined as an object that
+      |          shares distortion/camera matrix/artefcat rotation/artefact translation parameters)
+3     |       ->points (The 2D measured points)
+3     |       ->artefact (The 3D artefact points)
 
 keywords must remain the same throughout dataset
 example
@@ -78,8 +93,13 @@ would access the 5th pose (index from 0) measured 2d points on the component lab
 "inputs\03\upside-down rubbish projector\artefact"
 would access the 4th pose 3d artefact points on the component labelled "upside-down rubbish projector".
 
+Theoretically, you could label poses as you like, but I suggest using double digits 00 upwards, anything else
+could mix up poses and their estimations.
+
 The Levenberg-Marquardt algorithm (serial calibration) requires an estimation, which is provided using
 calibration\analytical_calibrate.py.
+
+As of yet, the parallel method and uncertainties are not yet implemented.
 
 ===============================================================
 HARDWARE CONSIDERATIONS
