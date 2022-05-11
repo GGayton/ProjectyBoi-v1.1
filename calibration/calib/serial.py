@@ -2,7 +2,6 @@ import tensorflow as tf
 import numpy as np
 import h5py
 
-
 from calib.base_calib import Calibration
 from commonlib.console_outputs import ProgressBar
 from commonlib.h5py_functions import num_of_keys
@@ -22,13 +21,17 @@ class SerialCalibration(Calibration):
         self.init_serial_functions()
 
     def init_serial_functions(self):
-        print("Tracing... ", end = "")
+        print("Tracing...", end = "")
 
         self.distort_TF = tf.function(self.distort, input_signature=(
             tf.TensorSpec(shape=[3,None], dtype=self.datatype),
             tf.TensorSpec(shape=[None], dtype=self.datatype)
             ))
         self.distort_TF = self.distort_TF.get_concrete_function()
+
+        self.get_num_points_TF = tf.function(self.get_num_points, input_signature=(
+            tf.RaggedTensorSpec(shape=[None,None,None],dtype=self.datatype),
+        ))
 
         self.back_project_TF = tf.function(self.back_project, input_signature=(
             tf.TensorSpec(shape=[3,None], dtype=self.datatype),
@@ -39,21 +42,20 @@ class SerialCalibration(Calibration):
             ))
         self.back_project_TF = self.back_project_TF.get_concrete_function()
 
-        self.transform_TF = tf.function(self.transform, input_signature=(
-            tf.RaggedTensorSpec(shape=[3,None,None],dtype=self.datatype,ragged_rank=1),
-            tf.TensorSpec(shape=[None], dtype=self.datatype)
-            ))
-        # self.transform_TF = self.transform_TF.get_concrete_function()
+        self.transform_TF = tf.function(self.transform)
 
         self.gradient_TF = tf.function(self.gradient,input_signature=(
             tf.TensorSpec(shape=[3,None], dtype=self.datatype),
+            tf.TensorSpec(shape=[5], dtype=self.datatype),
             tf.TensorSpec(shape=[None], dtype=self.datatype),
+            tf.TensorSpec(shape=[6], dtype=self.datatype),
             ))
 
-        self.jacobian_TF = tf.function(self.jacobian, input_signature=(
-            tf.RaggedTensorSpec(shape=[3,None,None],dtype=self.datatype,ragged_rank=1),
-            tf.TensorSpec(shape=[None], dtype=self.datatype)
-        ))
+        self.jacobian_TF = tf.function(self.jacobian)
+        #, input_signature=(
+         #   tf.RaggedTensorSpec(shape=[3,None,None],dtype=self.datatype,ragged_rank=1),
+          #  tf.TensorSpec(shape=[None], dtype=self.datatype)
+        #))
         print("done")
     
     def distort(self,x,X):
@@ -112,7 +114,7 @@ class SerialCalibration(Calibration):
         e_all = X[nI:]
         K = self.assemble_camera_matrix_TF(k)
         
-        num_positions = x.shape[2]
+        num_positions = x.shape[0]
 
         extrinsics = tf.split(e_all, num_positions)   
         
@@ -121,16 +123,16 @@ class SerialCalibration(Calibration):
         R = self.rodrigues_TF(r)
         T = tf.reshape(t, (3,1))
         
-        allEst = R @ x[:,:,0] + T
+        allEst = R @ tf.transpose(x[0].to_tensor()) + T
         
-        #Transform next sets an ocncatenate onto first
+        #Transform next sets an concatenate onto first
         for i in range(1,len(extrinsics)):
                                            
             r,t = tf.split(extrinsics[i], [3,3])
             R = self.rodrigues_TF(r)
             T = tf.reshape(t, (3,1)) 
             
-            estimate = R @ x[:,:,i] + T
+            estimate = R @ tf.transpose(x[i].to_tensor()) + T
             allEst = tf.concat((allEst, estimate),axis=1)
         
         #Proejctive transform and distort
@@ -142,18 +144,13 @@ class SerialCalibration(Calibration):
         
         return allEst 
                 
-    def gradient(self,x,X):
+    def gradient(self,x,k,D,e):
         
         nK = self.nK
         nI = self.nI
         
         with tf.GradientTape(persistent = False) as tape:
-            
-            #Set up inputs
-            k = X[:nK]
-            D = X[nK:nI]
-            e = X[nI:]
-            
+                        
             tape.watch(k)
             tape.watch(D)
             tape.watch(e)
@@ -164,9 +161,9 @@ class SerialCalibration(Calibration):
             T = tf.reshape(t, (3,1)) 
             
             #obtain intrinsics       
-            K = self.cameraMatrix(k)
+            K = self.assemble_camera_matrix_TF(k)
                                         
-            estimate = self.backProject(x,K,R,T,D)
+            estimate = self.back_project_TF(x,K,R,T,D)
             estimate = tf.reshape(tf.transpose(estimate), (-1,1))[:,0]
                 
         grad = tape.jacobian(estimate, [k,D,e])
@@ -179,72 +176,81 @@ class SerialCalibration(Calibration):
         nD = self.nD
         nI = self.nI
 
-        intrinsics = X[:nI]
-        extrinsicsAll = X[nI:]
+        k = X[:5]
+        D = X[5:nI]
+        e = X[nI:]
         
-        numPositions = extrinsicsAll.shape[0]//6
-        numPoints = x.shape[1]//1
+        num_positions = x.shape[0]//1
+        num_points = x.row_lengths()
+        total_points = tf.math.reduce_sum(num_points)
+        largest_pose = self.largest_slice(x)
     
-        extrinsics = tf.split(extrinsicsAll, numPositions)   
+        e = tf.split(e, num_positions)   
         
-        jacobian = tf.zeros((numPoints * numPositions * 2, numPositions*6 + nI),dtype=self.datatype)
+        jacobian = tf.zeros((total_points * 2, num_positions*6 + nI),dtype=self.datatype)
         
         #create base indices for scattering updates into jacobian with
         #(You can't do index assignment in TF, i.e. x[1,4] = 4)
-        i,j = tf.meshgrid(tf.linspace(0,numPoints*2-1,numPoints*2),tf.linspace(0,nK-1,nK), indexing='ij')
-        i = tf.cast(tf.reshape(i, (numPoints*nK*2,1)), dtype = tf.int32)
-        j = tf.cast(tf.reshape(j, (numPoints*nK*2,1)), dtype = tf.int32)
-        base_k_indices = tf.concat((i,j),axis=1)
+        i,j = tf.meshgrid(
+            tf.range(0, largest_pose*2),
+            tf.range(0, nI+6),
+            indexing='ij')
         
-        i,j = tf.meshgrid(tf.linspace(0,numPoints*2-1,numPoints*2),tf.linspace(nK,nI-1,nD), indexing='ij')
-        i = tf.cast(tf.reshape(i, (numPoints*nD*2,1)), dtype = tf.int32)
-        j = tf.cast(tf.reshape(j, (numPoints*nD*2,1)), dtype = tf.int32)
-        base_d_indices = tf.concat((i,j),axis=1)
-        
-        i,j = tf.meshgrid(tf.linspace(0,numPoints*2-1,numPoints*2),tf.linspace(nI,nI+5,6), indexing='ij')
-        i = tf.cast(tf.reshape(i, (numPoints*6*2,1)), dtype = tf.int32)
-        j = tf.cast(tf.reshape(j, (numPoints*6*2,1)), dtype = tf.int32)
-        base_e_indices = tf.concat((i,j),axis=1)
-        
-        i=0
-        for extrinsic in extrinsics:
-            
-            #parameter set for each position
-            parameters = tf.concat((intrinsics,extrinsic),axis=0)
-            
-            #constants to be added for each iteration
-            i_start = i*numPoints*2
-            r_start = i*6
+        points_tally = 0
+        for n in range(num_positions):
+
+            #constants to be added to indexes for each iteration
+            i_start = tf.cast(points_tally*2, dtype=tf.int32)
+            r_start = tf.cast(n*6, dtype=tf.int32)
+
+            nP = num_points[n]*2
             
             #obtain grad
-            grad = self.gradFunction(x,parameters)
+            grad = self.gradient_TF(tf.transpose(x[n].to_tensor()),k,D,e[n])
 
             #scatter in k values
-            kGrad = tf.reshape(grad[0], (numPoints*nK*2,1))[:,0]
+            index = tf.concat((
+                tf.reshape(i[:nP, :5], (-1,1)) + i_start,
+                tf.reshape(j[:nP, :5], (-1,1))
+            ),axis=1)
+            kGrad = tf.reshape(grad[0], (nP*nK,1))[:,0]
             jacobian = tf.tensor_scatter_nd_update(
                 jacobian, 
-                base_k_indices + tf.constant((i_start,0), dtype=tf.int32), 
+                index, 
                 kGrad
                 )
             
             #scatter in D values
-            DGrad = tf.reshape(grad[1], (numPoints*nD*2,1))[:,0]
+            index = tf.concat((
+                tf.reshape(i[:nP, 5:nI], (-1,1)) + i_start,
+                tf.reshape(j[:nP, 5:nI], (-1,1))
+            ),axis=1)
+            DGrad = tf.reshape(grad[1], (nP*nD,1))[:,0]
             jacobian = tf.tensor_scatter_nd_update(
                 jacobian, 
-                base_d_indices + tf.constant((i_start,0), dtype=tf.int32), 
+                index, 
                 DGrad
                 )
             
             #scatter in extrinsics
-            eGrad = tf.reshape(grad[2], (numPoints*6*2,1))[:,0]
+            index = tf.concat((
+                tf.reshape(i[:nP, nI:], (-1,1)) + i_start,
+                tf.reshape(j[:nP, nI:], (-1,1)) + r_start
+            ),axis=1)
+            eGrad = tf.reshape(grad[2], (nP*6,1))[:,0]
             jacobian = tf.tensor_scatter_nd_update(
                 jacobian, 
-                base_e_indices + tf.constant((i_start,r_start), dtype=tf.int32), 
+                index, 
                 eGrad
                 )
             
-            i=i+1
+            points_tally += num_points[n]
     
         return jacobian
-             
+
+    def get_num_points(self,tensor):
+        return tf.cast(tf.math.reduce_sum(tensor.row_lengths()), dtype = tf.int32)
+    
+    def largest_slice(self,tensor):
+        return tf.cast(tf.math.reduce_max(tensor.row_lengths()), dtype = tf.int32)
 

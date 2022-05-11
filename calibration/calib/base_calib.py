@@ -6,6 +6,13 @@ class Calibration():
         self.datatype = datatype
         self.init_base_functions()
 
+        self.options = {}
+        self.options["damping_factor"] = 10
+        self.options["verbosity"] = 1
+        self.options["max_failure"] = 5
+        self.options["min_change"] = 1e-10
+        self.options["max_iterations"] = 500
+        
     def init_base_functions(self):
         
         print("Tracing...", end="")
@@ -22,8 +29,7 @@ class Calibration():
             input_signature=(tf.TensorSpec(shape=[5], dtype=self.datatype),))
         self.assemble_camera_matrix_TF = self.assemble_camera_matrix_TF.get_concrete_function()
 
-        # self.JtJ_TF = tf.function(self.JtJ)
-        # self.JtJ_TF = self.JtJ_TF.get_concrete_function()
+        self.JtJ_TF = tf.function(self.JtJ)
 
         # self.weighted_JtJ_TF = tf.function(self.weighted_JtJ)
         # self.weighted_JtJ_TF = self.weighted_JtJ_TF.get_concrete_function()
@@ -105,6 +111,17 @@ class Calibration():
         
         return damping_factor
 
+    def get_options(self):
+
+        options = (
+            self.options["damping_factor"],
+            self.options["verbosity"],
+            self.options["max_failure"],
+            self.options["min_change"],
+            self.options["max_iterations"]
+        )
+        return options
+
     def JtJ(self,J,damping_factor):
                           
         JtJ = tf.transpose(J) @ J
@@ -121,33 +138,33 @@ class Calibration():
         
         return JtJ
                       
-    def train(self,x,y,X,dampingFactor,DISPLAY,FAILURE_COUNT_MAX,CHANGE_MIN,ITERATION_MAX):
+    def train(self,x,y,X):
                     
         optimised = tf.constant(False, dtype = tf.bool)
-        
+        damping_factor,verbosity,max_failure,min_change, max_iterations = self.get_options()
         failureCount = 0
                  
         epoch = tf.constant(0, dtype = tf.int32)
         
         #Initialise first loss and jacobian
-        loss = y - self.transformFunction(x,X)
+        loss = y - self.transform_TF(x,X)
         lossSum = tf.math.reduce_sum(loss**2)
-        J = self.jacobianFunction(x,X)
+        J = self.jacobian_TF(x,X)
         
         lossSumChange = tf.constant(1,dtype = self.datatype)
                 
         while not optimised:
             
-            JtJ = self.JtJFunction(J,dampingFactor)
+            JtJ = self.JtJ_TF(J,damping_factor)
 
-            # update = tf.linalg.lstsq(JtJ, tf.transpose(J) @ loss, fast=False)
+            #Solve the linear system
             update = tf.linalg.inv(JtJ) @ tf.transpose(J) @ loss
             
             #Assign the update
             XUpdate = X + update[:,0] 
 
             #Calculate a new loss
-            lossUpdate = y - self.transformFunction(x,XUpdate)
+            lossUpdate = y - self.transform_TF(x,XUpdate)
             
             #Has this improved the loss?
             lossSumUpdate = tf.reduce_sum(lossUpdate**2)
@@ -160,7 +177,7 @@ class Calibration():
             if condition:
                  
                 #Decrease the damping
-                dampingFactor = self.iterateDamping(dampingFactor, 0.5)
+                damping_factor = self.iterate_damping(damping_factor, 0.5)
                 
                 #Accept new value of loss, loss sum and parameters
                 loss = lossUpdate
@@ -168,7 +185,7 @@ class Calibration():
                 X = XUpdate
 
                 #Calculate new jacobian
-                J = self.jacobianFunction(x,X)
+                J = self.jacobian_TF(x,X)
                               
                 #Reset consecutive failure count
                 failureCount = 0
@@ -177,24 +194,24 @@ class Calibration():
             else:
                 
                 #Increase the damping
-                dampingFactor = self.iterateDamping(dampingFactor, 5)
+                damping_factor = self.iterate_damping(damping_factor, 5)
                 failureCount = failureCount + 1
                                             
             #Optimisation Check
-            optimised = (epoch>ITERATION_MAX) | (failureCount>FAILURE_COUNT_MAX) | ((lossSumChange<0)&(lossSumChange>-CHANGE_MIN))
-            if DISPLAY == 1:self.printUpdate(epoch, dampingFactor, lossSum)
+            optimised = (epoch>max_iterations) | (failureCount>max_failure) | ((lossSumChange<0)&(lossSumChange>-min_change))
+            if verbosity == 1:self.print_update(epoch, damping_factor, lossSum)
             
             epoch = tf.add(epoch, 1)
 
-        if DISPLAY != 0: 
-            self.printUpdate(epoch, dampingFactor, lossSum)            
+        if verbosity != 0: 
+            self.print_update(epoch, damping_factor, lossSum)            
             tf.print("\n===", "FINISHED", "===\n")
         
-        loss = y - self.transformFunction(x,X)
+        loss = y - self.transform_TF(x,X)
 
         return X, J, loss
   
-    def weightedTrain(self,x,y,X,W,dampingFactor,DISPLAY,FAILURE_COUNT_MAX,CHANGE_MIN,ITERATION_MAX):
+    def weightedTrain(self,x,y,X,W,damping_factor,DISPLAY,FAILURE_COUNT_MAX,CHANGE_MIN,ITERATION_MAX):
         
         print("Tracing: Train")                
         optimised = tf.constant(False, dtype = tf.bool)
@@ -212,7 +229,7 @@ class Calibration():
                 
         while not optimised:
             
-            JtJ = self.weightedJtJFunction(J,W,dampingFactor)
+            JtJ = self.weightedJtJFunction(J,W,damping_factor)
 
             # update = tf.linalg.lstsq(JtJ, tf.transpose(J) @ loss, fast=False)
             update = tf.linalg.inv(JtJ) @ tf.transpose(J) @ loss
@@ -234,7 +251,7 @@ class Calibration():
             if condition:
                  
                 #Decrease the damping
-                dampingFactor = self.iterateDamping(dampingFactor, 0.5)
+                damping_factor = self.iterateDamping(damping_factor, 0.5)
                 
                 #Accept new value of loss, loss sum and parameters
                 loss = lossUpdate
@@ -251,17 +268,17 @@ class Calibration():
             else:
                 
                 #Increase the damping
-                dampingFactor = self.iterateDamping(dampingFactor, 5)
+                damping_factor = self.iterateDamping(damping_factor, 5)
                 failureCount = failureCount + 1
                                             
             #Optimisation Check
             optimised = (epoch>ITERATION_MAX) | (failureCount>FAILURE_COUNT_MAX) | ((lossSumChange<0)&(lossSumChange>-CHANGE_MIN))
-            if DISPLAY == 1:self.printUpdate(epoch, dampingFactor, lossSum)
+            if DISPLAY == 1:self.printUpdate(epoch, damping_factor, lossSum)
             
             epoch = tf.add(epoch, 1)
 
         if DISPLAY != 0: 
-            self.printUpdate(epoch, dampingFactor, lossSum)            
+            self.printUpdate(epoch, damping_factor, lossSum)            
             tf.print("\n===", "FINISHED", "===\n")
         
         loss = y - self.transformFunction(x,X)

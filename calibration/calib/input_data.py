@@ -43,16 +43,42 @@ class InputData():
                         self.points[self.keys[i]][tkey[j]] = np.nan
                         self.artefact[self.keys[i]][tkey[j]] = np.nan
                         self.keymap[j,i] = 0
+            
+            #Load all poses
+            self.pose_ids = self.points[self.keys[0]].keys()
 
+            if len(self.keys)>1:
+                for key in self.keys[1:]:
+                    self.pose_ids = list(set(self.pose_ids) | set(self.points[key].keys()))
+            self.pose_ids = sorted(self.pose_ids)
+    
     def get_inputs_TF(self):
-        out = [[] for _ in range(len(self.keys))]
-        for i in range(len(self.keys)):
-            temp = []
+        out = {}
+        art = {}
+        for key in self.keys:
+            point_set = []
+            art_set = []
+            print("adding random")
+
+            #Construct a ragged tensor for each component. If a particular pose is not
+            #used for that component, that slice of the ragged tensor is blank
             for j in range(self.num_positions):
-                temp += [self.points[self.keys[i]]["{:02d}".format(j)].T.reshape(-1,1)]
-            out[i] = np.vstack(temp)
-        
-        return out
+
+                pose_id = "{:02d}".format(j)
+                
+                i = np.random.randint(0,184)
+
+                if pose_id in list(self.points[key].keys()):
+                    point_set += [self.points[key][pose_id][:i,:].T.reshape(-1,1)]
+                    art_set += [self.artefact[key][pose_id][:i,:]]
+                else:
+                    point_set += []
+                    art_set += []
+
+            out[key] = tf.constant(np.vstack(point_set), dtype = self.datatype)
+            art[key] = tf.ragged.constant(art_set, dtype=self.datatype)
+
+        return out,art
 
     def get_inputs_numpy(self):
         out = [[] for _ in range(len(self.keys))]
@@ -72,16 +98,6 @@ class InputData():
     
     def get_inputs_dict(self):
         return self.points,self.artefact
-
-    def get_pose_IDs(self):
-
-        assert self.keys!=None, "You must load the inputs first."
-
-        out = {}
-        for key in self.keys:
-            out[key] = list(self.points[key].keys())
-
-        return out
 
     def load_estimate(self, filename):
         
@@ -116,6 +132,36 @@ class InputData():
                     self.params[key]["extrinsic"]["translation"][pose_id] =\
                         f[key]["extrinsic"][pose_id]["translation"][()]
 
+    def get_serial_estimate(self):
+        params = {}
+        num_poses = len(self.pose_ids)
+        for key in self.keys:
+
+            num_dist_params = self.params[key]["distortion"].shape[0]
+            temp = np.zeros(5+num_dist_params)
+            temp[:5] = self.params[key]["matrix"][[0,1,0,0,1],[0,1,1,2,2]]
+            temp[5:5+num_dist_params] = self.params[key]["distortion"]
+
+            for id in self.pose_ids:
+                if id in self.params[key]["extrinsic"]["rotation"].keys():
+                    temp = np.concatenate((
+                        temp,
+                        self.params[key]["extrinsic"]["rotation"][id].flatten(),
+                        self.params[key]["extrinsic"]["translation"][id].flatten()
+                    ),axis=0)
+                else:
+                    temp = np.concatenate((
+                        temp,
+                        np.zeros(6)
+                    ),axis=0)
+                    
+            params[key] = tf.constant(temp,dtype = self.datatype)
+
+        return params
+
+
+
+
     @staticmethod
     def check_list(list1,list2):
         return sorted(list1) == sorted(list2)
@@ -126,9 +172,6 @@ class InputData():
         else:
             assert self.check_list(temp_keys, self.keys), \
             "There is a mismatch in the keys already realised - to reset, set self.keys=None."
-
-
-
             
     def getInput(self):
         cOut = tf.transpose(self.cPoints.concat())

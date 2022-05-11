@@ -3,12 +3,14 @@ import numpy as np
 import sys
 import os
 import h5py
+import matplotlib.pyplot as plt
 
 assert os.path.basename(os.getcwd()) == "calibration"
 if "..\\" not in sys.path:sys.path.append("..\\")
 
 from calib.input_data import InputData
 from calib.analytical_calib import AnalyticalCalibration
+from commonlib.rotations import rodrigues
 #%% Choose dataset
 dataset = "2022_02_24"
 dataset_filename =  r"data\\" + dataset + r"\\Inputs\dotsTest.hdf5"
@@ -53,9 +55,22 @@ for ckey in points.keys():
 
 #%% obtain extrinsics guess
 r,t = calib.estimate_extrinsics(ext_r,ext_t,"camera")
-poseIDs = inputdata.get_pose_IDs()
+poseIDs = inputdata.pose_ids
 
 #%% Reprojection errors
+plt.close('all')
+for ckey in K.keys():
+    plt.figure()
+    for pkey in artefact[ckey].keys():
+        R = rodrigues(ext_r[ckey][pkey])
+        T = ext_t[ckey][pkey].reshape(1,3)
+        
+        temp = (artefact[ckey][pkey] @ R.T + T) @ K[ckey].T
+        temp = temp/temp[:,2:3]
+
+        err = temp - points[ckey][pkey]
+
+        plt.scatter(err[:,0], err[:,1], s=3)
 
 #%% save
 
