@@ -88,10 +88,21 @@ print("="*50)
 L = 0.95
 H = 1.05
 
-optimCamParams, Jc, residualsC = calib.train(
-    artefact["camera"],
-    points["camera"],
-    params["camera"],# * tf.random.uniform(initCamParams.shape, minval = L, maxval = H, dtype = DATATYPE),
-    )
+optim_params = {}
+J = {}
+residuals = {}
+
+for key in inputdata.keys:
+    optim_params[key], J[key], residuals[key] = calib.train(
+        artefact[key],
+        points[key],
+        params[key],# * tf.random.uniform(initCamParams.shape, minval = L, maxval = H, dtype = DATATYPE),
+        )
+# %% reprojection errors
+
+plt.close('all')
+for key in inputdata.keys:
+    plt.figure()
+    plt.scatter(residuals[key][::2].numpy(), residuals[key][1::2], s=3)
 
 # %%
