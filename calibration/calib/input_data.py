@@ -58,7 +58,6 @@ class InputData():
         for key in self.keys:
             point_set = []
             art_set = []
-            print("adding random")
 
             #Construct a ragged tensor for each component. If a particular pose is not
             #used for that component, that slice of the ragged tensor is blank
@@ -66,11 +65,10 @@ class InputData():
 
                 pose_id = "{:02d}".format(j)
                 
-                i = np.random.randint(0,184)
 
                 if pose_id in list(self.points[key].keys()):
-                    point_set += [self.points[key][pose_id][:i,:].reshape(-1,1)]
-                    art_set += [self.artefact[key][pose_id][:i,:]]
+                    point_set += [self.points[key][pose_id].reshape(-1,1)]
+                    art_set += [self.artefact[key][pose_id]]
                 else:
                     point_set += []
                     art_set += []

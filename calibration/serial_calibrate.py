@@ -104,5 +104,7 @@ plt.close('all')
 for key in inputdata.keys:
     plt.figure()
     plt.scatter(residuals[key][::2].numpy(), residuals[key][1::2], s=3)
+    print(key, ": ", np.sum(residuals[key].numpy()**2)**0.5)
+
 
 # %%
