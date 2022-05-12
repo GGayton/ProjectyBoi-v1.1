@@ -65,6 +65,9 @@ print(calib.options)
 print("="*50)
 
 #%%
+J = calib.jacobian(artefact["camera"], params["camera"])
+
+#%%
 # test1 = points["camera"][:artefact["camera"][0].shape[0]*2]
 # test2 = calib.back_project(
 #     tf.transpose(artefact["camera"][0].to_tensor()), 
@@ -96,7 +99,7 @@ for key in inputdata.keys:
     optim_params[key], J[key], residuals[key] = calib.train(
         artefact[key],
         points[key],
-        params[key],# * tf.random.uniform(initCamParams.shape, minval = L, maxval = H, dtype = DATATYPE),
+        params[key],# * tf.random.uniform(params[key].shape, minval = L, maxval = H, dtype = DATATYPE),
         )
 # %% reprojection errors
 
