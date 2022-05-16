@@ -143,9 +143,7 @@ class CameraControl(QObject):
                         
                         #Pass to saver
                         self.camera_queue.put(pix_array[:,:,0])
-                            
-
-                        
+                                                    
                     QApplication.processEvents()
                     
         print("Camera:         COMPLETE")
@@ -208,8 +206,8 @@ class CameraControl(QObject):
         print("Camera:         COMPLETE")
         self.finish_cond.release(1)
         
-        self.auto_mode = not self.auto_mode
-        print("Camera:         Auto mode is {}".format(self.auto_mode))
+        # self.auto_mode = not self.auto_mode
+        # print("Camera:         Auto mode is {}".format(self.auto_mode))
    
     @Slot()
     def stop_streaming(self):

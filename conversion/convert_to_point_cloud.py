@@ -53,6 +53,10 @@ plot_pointcloud(xyz)
 
 #%% Save to notepad file
 
+# The commented code below will output the point-cloud to a text file - which
+# is extremely slow. It is far quicker, and consumes less memory to use specific
+# libraries and write to a .hdf5 file or perhaps a .ply file.
+
 # bar = ProgressBar()
 
 # bar.updateBar(0,len(xyz))

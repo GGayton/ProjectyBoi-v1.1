@@ -17,7 +17,7 @@ Calibration quantifies the parameters that define the system e.g. focal length e
 MEASUREMENT:
 ===============================================================
 The measurement folder holds the modules and scripts required to run the fringe projection system.
-The measurement is completed entirelyu using the QT library, which allows both multithreading, pixel writing and UI.
+The measurement is completed entirely using the QT library, which allows both multithreading, pixel writing and UI.
 
 \measurement\ProjectyBoi2001.py 
 	initialises and runs all the code necessary, i.e. run ProjectyBoi2001.py 
@@ -38,6 +38,15 @@ The measurement modules and their functions are:
  - streamer            | seperate sub-window to view and check images (for aligning objects, checking over exposure etc.)
  - measurement         | macrosync all components together
 
+The entire measurement works using QSemaphore to track when to project an image and when to acquire one, and using queue, 
+which is a first in first out queue to pass information between threads.
+
+Each *******_cond object is a QSemaphore object which works using .acquire(), which acquires on token
+from the object. If a token is not there to be taken, then the thread pauses until there is a token
+available.
+
+The behaviour of the UI in taking a measurement immediately after a measurement is not 100%
+tested. For critical measurements, would suggest closing projecyboi and rerunning the script.
 ===============================================================
 CONVERSION:
 ===============================================================
@@ -75,7 +84,7 @@ this on a dot grid. Other methods for differing artefact are not written. Any fe
 method must produce a set of 2D image points, that match the input hdf5 file hierarchy:
 
 (a {} implies a user designated phrase, otherwise the key must match, i.e. the first level
-of the .hdf5 file must be "inputs", which allows other data to be stored on the input file)
+of the .hdf5 file must be "inputs", which allows other data to be stored on the file)
 
 level | key
 0     | ->inputs
@@ -97,9 +106,9 @@ Theoretically, you could label poses as you like, but I suggest using double dig
 could mix up poses and their estimations.
 
 The Levenberg-Marquardt algorithm (serial calibration) requires an estimation, which is provided using
-calibration\analytical_calibrate.py.
-
-As of yet, the parallel method and uncertainties are not yet implemented.
+calibration\analytical_calibrate.py. The rotation/translation between cameras/projectors can be 
+found using the individual estimation of the artefact in each common pose. As of yet, the parallel
+method and uncertainties are not yet implemented.
 
 ===============================================================
 HARDWARE CONSIDERATIONS
@@ -116,3 +125,41 @@ The camera is controlled using an API called vimba - replacing the camera will r
 
 A new projector that is not sent images using HDMI (or another HD digital output) will require an 
 entirely new "projector" class.
+
+When changing the camera or projector and the connecion between them must be changed, ensure to 
+GROUND the signal cable - there is a lot of EM interference in the lab.
+
+===============================================================
+KNOWN ISSUES/MISSING FUNCTIONALITY
+===============================================================
+CAMERA IMAGE     |The camera is known to occasionally return either a blank image - or a repeated image.
+                 |The error seems to happen between 1 in 100 - 1 in 200 images taken. These measurements
+                 |are not recoverable and will have to be taken again. It's believed to be a camera issue - 
+                 |after taking 1000s of images - the error rate will increase dramatically. This may be improved
+_________________|by repairing the vimba install.
+CAMERA IMAGE     |The camera image error described above can potentially be circumvented when taking multiple 
+ERROR HANDLING   |images per projector image by check for discrepancies between each repeated camera image.
+_________________|
+IMPERFECT        |The camera-projector synchronisation could be improved - it is synchronised as much as is 
+SYNCHRONISATION  |possible. To improve the synchronisation, a complete system rehaul would be required since the
+_________________|HDMI signal is driving these issues.
+NO EXCEPTION     |Any exceptions will lead to the screen hanging and requiring a restart of the 
+HANDLING         |kernel.
+_________________|
+NO PHASE MAP     |Currently, no filtering is applied to the phase map, which would greatly improve the 
+FILTERING        |rate at detecting phase unwrapping errors. The calculation is essentially
+_________________|completed but no filtering is being done.
+NO 3D POSITION   |Checking the feinal 3D points would be a cheap method to clear out any unwrapping
+FILTERING        |error outliers.
+_________________|
+PROJECTOR        |There is a way to automatically set projector options, there may even already be a library
+OPTIONS          |available to handle this. Otherwise, the commands can be found in the proejctor
+_________________|handbook.
+UNCHECKED REPEAT |The repeat measurement section is not check - and may not work completely well. This function
+MEASUREMENT FCN  |should be checked before conducting any long-lengt measurements.
+_________________|
+CUDA             |CUDA implementation in the conversion (replacing numpy with cupy) will massively speed up
+IMPLEMENTATION   |measurements - but requires a GPU with ~>4GB of memory.
+_________________|
+CAMERA TEMP      |Camera has a built-in temperature sensor that should be utilised.
+SENSOR           |

@@ -100,7 +100,7 @@ class TaskManager(QObject):
         print('Loaded {} images.'.format(i+1))
         
     def pass_to_projector(self, N):
-        
+
         for i in range(0, N):
             self.projector_queue.put(self.image_stack[i])
     
@@ -112,6 +112,9 @@ class TaskManager(QObject):
         self.project_N_images_signal.emit(1)
         
         self.camera_cond.acquire(1)
+        
+        self.finish_cond.acquire(1)
+                
     
     @Slot()
     def set_nth_image(self, N):

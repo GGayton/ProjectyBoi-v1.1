@@ -6,6 +6,7 @@ import sys
 import h5py
 
 home = "..\\"
+if home not in sys.path: sys.path.append(home)
 
 from commonlib.directory import recursive_file_finder
 
