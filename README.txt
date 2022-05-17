@@ -163,3 +163,7 @@ IMPLEMENTATION   |measurements - but requires a GPU with ~>4GB of memory.
 _________________|
 CAMERA TEMP      |Camera has a built-in temperature sensor that should be utilised.
 SENSOR           |
+_________________|
+GENERIC          |The conversion is not currently generic to multiple cameras and projectors, while the calibration
+CONVERSION		 |is. This is missing functionality - which will require overhauling the saver class too, so that
+				 |images are saved to their respective components, instead of just saving the single image.
