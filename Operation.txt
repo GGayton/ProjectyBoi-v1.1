@@ -6,10 +6,10 @@
 Set up projector:
 
 1. Turn on projector GUI (DLPLCR4500 GUI 4.0.0)
-2. set to "pattern mode"
+2. set to "pattern sequence"
 3. Set pattern mode to "white"
-3. Set input to vync/video port
-4. Set pattern exposure (9000)
+3. Set input to vsync/video port
+4. Set pattern exposure: 9000
 5. Set pattern bit depth to 8 bit
 6. Add 8 bit green to pattern
 7. Send
