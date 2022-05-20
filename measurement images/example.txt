@@ -1,0 +1,3 @@
+Images will be stored here in directory {DATE}, name {TIME}.
+
+Keys are as normal - "00" first image, "01" second image etc..

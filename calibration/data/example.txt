@@ -1,0 +1,5 @@
+Calibration directory should include the following substructures:
+
+raw data - raw images of calibration go here
+parameter ouputs - the estimated parameters are stored here
+inputs - inputs to the characterisation go here (board points, image points etc)
