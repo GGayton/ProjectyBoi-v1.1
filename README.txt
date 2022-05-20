@@ -62,6 +62,15 @@ The conversion modules and their functions are:
  - model                  | object that performs the decoded image-> point-cloud conversion
  - nonlinear_correction   | performs the distortion correction
 
+Parameter files are held as 
+
+level | key
+0     | ->{keyword} (for each component)
+1     |   ->{matrix} (camera matrix)
+1     |   ->{distortion} (vector holding distortion components)
+1     |   ->{rotation} (rodrigues vector rotation from common coordinates)
+1     |   ->{translation} {translation vector from common coordinates) 
+
 ===============================================================
 CALIBRATION:
 ===============================================================
