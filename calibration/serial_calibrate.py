@@ -22,6 +22,7 @@ tf.config.optimizer.set_experimental_options(options)
 
 from calib.input_data import InputData
 from calib.serial import SerialCalibration
+from calib.analytical_calib import AnalyticalCalibration
 
 #%% set datasets
 dataset = "2022_02_24"
@@ -55,7 +56,7 @@ calib = SerialCalibration()
 
 calib.options["damping_factor"] = 10
 calib.options["verbosity"] = 1
-calib.options["max_iterations"] = 20
+calib.options["max_iterations"] = 200
 calib.options["min_change"] = 0.0001
 calib.options["max_failure"] = 5
 
@@ -67,25 +68,6 @@ print("="*50)
 #%%
 J = calib.jacobian(artefact["camera"], params["camera"])
 
-#%%
-# test1 = points["camera"][:artefact["camera"][0].shape[0]*2]
-# test2 = calib.back_project(
-#     tf.transpose(artefact["camera"][0].to_tensor()), 
-#     calib.assemble_camera_matrix(params["camera"][:5]),
-#     calib.rodrigues(params["camera"][12:15]),
-#     tf.reshape(params["camera"][15:18],(3,1)),
-#     params["camera"][5:12])
-# # test2 = tf.reshape(tf.transpose(test2), (-1,1))
-# test2 = tf.reshape(test2, (-1,1))
-
-# err = test1 - test2
-# plt.close('all')
-# plt.scatter(err[::2], err[1::2],s=3)
-# #%%
-# test = points["camera"] - calib.transform(artefact["camera"], params["camera"])
-
-# plt.close('all')
-# plt.scatter(test[::2], test[1::2],s=3)
 #%% clib
 
 L = 0.95
@@ -109,5 +91,32 @@ for key in inputdata.keys:
     plt.scatter(residuals[key][::2].numpy(), residuals[key][1::2], s=3)
     print(key, ": ", np.sum(residuals[key].numpy()**2)**0.5)
 
+#%% assemble parameters
+
+K,D,ext_r,ext_t = {},{},{},{}
+for key in inputdata.keys:
+    K[key],D[key],ext_r[key],ext_t[key] =\
+        calib.assemble_parameters(artefact[key], optim_params[key])
+
+#%% estimate extrinsics
+ecalib = AnalyticalCalibration()
+r,t = ecalib.estimate_extrinsics(ext_r,ext_t,"camera")
+
+#%% save
+
+filename = r"data\\" + dataset + r"\\parameter outputs\serial_parameters.hdf5"
+with h5py.File(filename, 'w-') as f:
+
+    for name in inputdata.keys:
+        
+        f.create_dataset(name + r"/matrix", data=K[name])
+        f.create_dataset(name + r"/distortion", data=D[name])
+        f.create_dataset(name + r"/rotation", data=r[name])
+        f.create_dataset(name + r"/translation", data=t[name])
+
+        for pose_id in ext_r[name].keys():
+            extrinsic_string = name + r"/extrinsic//" + pose_id
+            f.create_dataset(extrinsic_string + r"/rotation", data=ext_r[name][pose_id])
+            f.create_dataset(extrinsic_string + r"/translation", data=ext_t[name][pose_id])
 
 # %%

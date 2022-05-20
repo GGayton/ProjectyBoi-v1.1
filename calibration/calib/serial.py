@@ -122,7 +122,7 @@ class SerialCalibration(Calibration):
         r,t = tf.split(extrinsics[0], [3,3])
         R = self.rodrigues_TF(r)
         T = tf.reshape(t, (3,1))
-        print(D)
+
         allEst = R @ tf.transpose(x[0].to_tensor()) + T
         
         #Transform next sets an concatenate onto first
@@ -254,3 +254,23 @@ class SerialCalibration(Calibration):
     def largest_slice(self,tensor):
         return tf.cast(tf.math.reduce_max(tensor.row_lengths()), dtype = tf.int32)
 
+    def assemble_parameters(self,x,params):
+
+        nI = self.nI
+        nK = self.nK
+
+        K = self.assemble_camera_matrix(params[:nK]).numpy()
+        D = params[nK:nI].numpy()
+
+        ext_r = {}
+        ext_t = {}
+        for i in range(x.shape[0]):
+            
+            if x[i].shape[0] != 0:
+                string = "{:02d}".format(i)
+                ext_r[string] = params[nI+0+6*i:nI+3+6*i].numpy()
+                ext_t[string] = params[nI+3+6*i:nI+6+6*i].numpy()
+
+        return K,D,ext_r,ext_t
+
+        

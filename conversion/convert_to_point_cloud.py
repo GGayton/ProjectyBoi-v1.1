@@ -1,16 +1,20 @@
+#%% Imports
 import sys
 import h5py
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
+import os
+print(os.getcwd())
+
 if "..\\" not in sys.path:sys.path.append("..\\")
 
-from clib.model import Measurement
+from clib.dual_model import Measurement
 from clib.decoding import Decode
 from commonlib.directory import recursive_file_list_finder
 from commonlib.pixel_selector import define_area_ocv as define_area
-from commonlib.plotting import plot_pointcloud
+# from commonlib.point_cloud import plot_pointcloud
 
 #%% Choose measurement
 measurement_dir = "..\\measurement images"
@@ -24,7 +28,7 @@ uinput = input('Crop area? y/n')
 if uinput == 'y':mask = define_area(image)
 else: mask = np.ones_like(image, dtype = bool)
 #%% Choose model
-parameterFilename = "parameters//model_parameters.hdf5"
+parameterFilename = "parameters\\serial_parameters.hdf5"
 
 #%% Convert decoded images to 3D points
 
